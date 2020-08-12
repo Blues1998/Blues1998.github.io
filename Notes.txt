@@ -1,0 +1,31 @@
+Tutorial:
+
+
+Step 1:
+
+Edit any file in brackets editor, see how the changes you are making reflect
+in the actual webpage.
+
+Step 2: 
+
+Once you are done making changes for now and you want to upload it to the remote
+server, follow these steps:
+
+
+	Step 2 a:
+	
+		In the directory of your project,
+		right click and select open git bash here.
+	
+	Step 2 b:
+		
+		In Git bash, type these commands:
+
+		1. git status      -> This will show you what files have been changed.
+		2. git add .       -> This will try to add all the files to the stage, this is step before committing
+			2.a. If you get a warning like: warning: LF will be replaced by CRLF in ________ , run the next code
+			2.b. git config core.autocrlf true
+			2.c. git add .       -> After running the previous command, run this one again
+		3. git commit -m "Add a message here, description about the changes you made to the files"
+		4. git status      -> To check if all the files have been committed or not
+		5. git push origin master      -> To finally upload everything on the remote server
