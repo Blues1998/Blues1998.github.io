@@ -1220,6 +1220,9 @@
 .fa-instagram:before {
   content: "\f16d";
 }
+.fa-github:before {
+  content: "\f092";
+}
 .fa-flickr:before {
   content: "\f16e";
 }
