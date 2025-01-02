@@ -28,11 +28,51 @@
             font-weight: bold;
             color: #007acc;
         }
+        form {
+            margin: 2rem auto;
+            padding: 1.5rem;
+            max-width: 700px;
+            background: #ffffff;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        form label {
+            display: block;
+            text-align: left;
+            margin: 0.5rem 0;
+            font-weight: bold;
+        }
+        input[type="email"], textarea {
+            width: 100%;
+            padding: 0.5rem;
+            margin: 0.5rem 0 1rem 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-family: 'Georgia', serif;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 0.7rem 1.5rem;
+            background-color: #007acc;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            display: block;
+            margin: 0 auto;
+        }
+        button:hover {
+            background-color: #005f99;
+        }
     </style>
 </head>
 <body>
     <div class="message">
-        <p>Hey Roshni,</p>
+        <p><a href="https://media1.tenor.com/m/pGA8uA1VLdgAAAAC/dog-hey-cutie.gif" style="text-decoration: none; color: inherit;">Hi Roshni</a></p>
+
         <p>I’ve got to admit, completing my profile to be allowed to send a message was way more work than I expected—especially with the voice prompt. But then I came across your profile, and it felt like it was worth it. So here I am, typing this out for you.</p>
         <p>Honestly, I’m not trying to impress you in an over-the-top way, but I just wanted to reach out. I figured I’d take a chance, so here goes!</p>
         <p>As per your prompt, here’s something from two of my favorite hobbies:</p>
@@ -42,5 +82,16 @@
         <p>Hope that piques your curiosity! I’m looking forward to chatting with you soon.</p>
         <p>- Animesh</p>
     </div>
+
+    <!-- Form for Roshni's response -->
+    <form action="https://formspree.io/f/xovvpvaa" method="POST">
+        <label for="email">Your email:</label>
+        <input type="email" id="email" name="email" placeholder="Enter your email" required>
+
+        <label for="message">Your message:</label>
+        <textarea id="message" name="message" placeholder="Leave your reply here if you're interested!" required></textarea>
+
+        <button type="submit">Send</button>
+    </form>
 </body>
 </html>
