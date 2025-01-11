@@ -37,6 +37,7 @@
             gap: 0;
             justify-content: center;
             border: 3px solid black;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
         }
         .cell {
             width: 100px;
@@ -74,6 +75,20 @@
         button:hover {
             background-color: #6a11cb;
         }
+        .highlight {
+            background-color: #ffd700 !important;
+            color: #000;
+            animation: glow 1s infinite alternate;
+        }
+
+        @keyframes glow {
+            from {
+                box-shadow: 0 0 10px #ffd700;
+            }
+            to {
+                box-shadow: 0 0 20px #ffd700;
+            }
+        }
     </style>
 </head>
 <body>
@@ -93,6 +108,11 @@
         let cells = ['', '', '', '', '', '', '', '', ''];
         let currentPlayer = 'X';
         let gameActive = true;
+
+        // Sound effects
+        const markSound = new Audio('https://www.soundjay.com/button/sounds/button-29.mp3');
+        const winSound = new Audio('https://www.soundjay.com/button/sounds/button-10.mp3');
+        const drawSound = new Audio('https://www.soundjay.com/button/sounds/button-11.mp3');
 
         // Create the board
         function createBoard() {
@@ -114,9 +134,12 @@
 
             cells[index] = currentPlayer;
             event.target.textContent = currentPlayer;
+            markSound.play();
 
             if (checkWinner()) {
+                highlightWinner();
                 winnerText.textContent = `${currentPlayer} wins!`;
+                winSound.play();
                 gsap.fromTo('#winner', { opacity: 0 }, { opacity: 1, duration: 1 });
                 gameActive = false;
                 turnText.textContent = '';
@@ -125,6 +148,7 @@
 
             if (!cells.includes('')) {
                 winnerText.textContent = "It's a tie!";
+                drawSound.play();
                 gsap.fromTo('#winner', { opacity: 0 }, { opacity: 1, duration: 1 });
                 gameActive = false;
                 turnText.textContent = '';
@@ -145,8 +169,25 @@
 
             return winningCombinations.some(combination => {
                 const [a, b, c] = combination;
-                return cells[a] !== '' && cells[a] === cells[b] && cells[a] === cells[c];
+                if (cells[a] !== '' && cells[a] === cells[b] && cells[a] === cells[c]) {
+                    highlightCombination(combination);
+                    return true;
+                }
+                return false;
             });
+        }
+
+        // Highlight the winning combination
+        function highlightCombination(combination) {
+            combination.forEach(index => {
+                const cell = board.children[index];
+                cell.classList.add('highlight');
+            });
+        }
+
+        // Prevent additional moves after a win
+        function highlightWinner() {
+            gameActive = false;
         }
 
         // Restart the game
