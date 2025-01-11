@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic Tac Toe</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js" defer></script>
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #6a11cb, #2575fc);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+        }
+        .container {
+            text-align: center;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        .turn {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-template-rows: repeat(3, 100px);
+            gap: 0;
+            justify-content: center;
+            border: 3px solid black;
+        }
+        .cell {
+            width: 100px;
+            height: 100px;
+            background-color: white;
+            border: 1px solid black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            font-weight: bold;
+            color: black;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        .cell:hover {
+            background-color: #f0f0f0;
+            transform: scale(1.05);
+        }
+        .winner {
+            font-size: 1.5rem;
+            margin-top: 1rem;
+        }
+        button {
+            margin-top: 1rem;
+            padding: 10px 20px;
+            background-color: #2575fc;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #6a11cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tic Tac Toe</h1>
+        <div class="turn" id="turn">Player X's turn</div>
+        <div class="board" id="board"></div>
+        <div class="winner" id="winner"></div>
+        <button id="restart">Restart Game</button>
+    </div>
+    <script>
+        const board = document.getElementById('board');
+        const winnerText = document.getElementById('winner');
+        const restartButton = document.getElementById('restart');
+        const turnText = document.getElementById('turn');
+
+        let cells = ['', '', '', '', '', '', '', '', ''];
+        let currentPlayer = 'X';
+        let gameActive = true;
+
+        // Create the board
+        function createBoard() {
+            board.innerHTML = '';
+            cells.forEach((cell, index) => {
+                const cellElement = document.createElement('div');
+                cellElement.classList.add('cell');
+                cellElement.dataset.index = index;
+                cellElement.textContent = cell;
+                cellElement.addEventListener('click', handleCellClick);
+                board.appendChild(cellElement);
+            });
+        }
+
+        // Handle cell click
+        function handleCellClick(event) {
+            const index = event.target.dataset.index;
+            if (cells[index] !== '' || !gameActive) return;
+
+            cells[index] = currentPlayer;
+            event.target.textContent = currentPlayer;
+
+            if (checkWinner()) {
+                winnerText.textContent = `${currentPlayer} wins!`;
+                gsap.fromTo('#winner', { opacity: 0 }, { opacity: 1, duration: 1 });
+                gameActive = false;
+                turnText.textContent = '';
+                return;
+            }
+
+            if (!cells.includes('')) {
+                winnerText.textContent = "It's a tie!";
+                gsap.fromTo('#winner', { opacity: 0 }, { opacity: 1, duration: 1 });
+                gameActive = false;
+                turnText.textContent = '';
+                return;
+            }
+
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            turnText.textContent = `Player ${currentPlayer}'s turn`;
+        }
+
+        // Check for a winner
+        function checkWinner() {
+            const winningCombinations = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+                [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+                [0, 4, 8], [2, 4, 6]             // Diagonals
+            ];
+
+            return winningCombinations.some(combination => {
+                const [a, b, c] = combination;
+                return cells[a] !== '' && cells[a] === cells[b] && cells[a] === cells[c];
+            });
+        }
+
+        // Restart the game
+        function restartGame() {
+            cells = ['', '', '', '', '', '', '', '', ''];
+            currentPlayer = 'X';
+            gameActive = true;
+            winnerText.textContent = '';
+            turnText.textContent = "Player X's turn";
+            createBoard();
+        }
+
+        restartButton.addEventListener('click', restartGame);
+
+        // Initialize the game
+        createBoard();
+    </script>
+</body>
+</html>
