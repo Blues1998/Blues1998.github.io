@@ -1,0 +1,34 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import ProjectCard from "../../components/ProjectCard.astro";
+import { getCollection } from "astro:content";
+
+const projects = await getCollection("projects");
+
+// Sort: explicit order → title
+projects.sort((a, b) => {
+  if (a.data.order && b.data.order) {
+    return a.data.order - b.data.order;
+  }
+  return a.data.title.localeCompare(b.data.title);
+});
+---
+
+<BaseLayout
+  title="Projects — Animesh Singh"
+  description="Selected engineering projects with context, trade-offs, and reflections."
+>
+  <section>
+    <h1>Projects</h1>
+
+    <div class="project-grid">
+      {projects.map((project) => (
+        <ProjectCard
+          title={project.data.title}
+          summary={project.data.summary}
+          href={`/projects/${project.slug}/`}
+        />
+      ))}
+    </div>
+  </section>
+</BaseLayout>

@@ -153,3 +153,29 @@ footer {
   font-size: var(--font-size-sm);
   color: var(--color-muted);
 }
+
+/* ---------- Project detail content ---------- */
+.project-content {
+  max-width: var(--max-width);
+}
+
+.project-content h2 {
+  margin-top: var(--space-5);
+}
+
+.project-content p {
+  margin-bottom: var(--space-3);
+}
+
+.project-content img {
+  margin: var(--space-4) 0;
+  border-radius: var(--radius-sm);
+}
+
+.project-content pre {
+  padding: var(--space-3);
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  background: rgba(28, 30, 33, 0.04);
+  font-size: var(--font-size-sm);
+}
