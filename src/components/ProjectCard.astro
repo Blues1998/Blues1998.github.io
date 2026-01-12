@@ -1,0 +1,11 @@
+---
+const { title, summary, href } = Astro.props;
+---
+
+<article class="project-card">
+  <h3>
+    <a href={href}>{title}</a>
+  </h3>
+
+  <p class="project-meta">{summary}</p>
+</article>

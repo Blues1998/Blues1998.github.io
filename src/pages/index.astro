@@ -1,21 +1,54 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import ProjectCard from "../components/ProjectCard.astro";
 ---
 
 <BaseLayout
-  title="Animesh Singh — Engineer & Photographer"
-  description="Software engineer with a focus on clean systems, thoughtful design, and creative work."
+  title="Animesh Singh — Engineer, Photographer, Musician"
+  description="Engineer focused on clean systems and thoughtful design. Photographer and musician exploring light and sound."
 >
+  <!-- Hero -->
   <section>
     <h1>Animesh Singh</h1>
 
-    <p style="max-width: 50ch;">
-      Engineer building calm, reliable systems.<br />
+    <p>
+      Software engineer building calm, reliable systems.<br />
       Photographer and musician exploring light and sound.
     </p>
 
-    <p>
-      <a href="/projects/">View projects</a>
-    </p>
+    <div class="button-row">
+      <a href="/projects/" class="button">View projects</a>
+      <a href="/photography/" class="button">Photography</a>
+      <a href="/music/" class="button">Music</a>
+    </div>
+  </section>
+
+  <!-- Signals -->
+  <section>
+    <h2>Signals</h2>
+    <ul class="signals">
+      <li>• Production-minded engineer with a bias for simplicity</li>
+      <li>• Solo builder — comfortable owning systems end-to-end</li>
+      <li>• Care deeply about clarity, maintainability, and craft</li>
+    </ul>
+  </section>
+
+  <!-- Featured projects -->
+  <section>
+    <h2>Selected work</h2>
+
+    <div class="project-grid">
+      <ProjectCard
+        title="STAXLS"
+        summary="Excel-driven test automation tool used in production environments."
+        href="/projects/staxls/"
+      />
+
+      <ProjectCard
+        title="Personal Portfolio"
+        summary="This site — designed and built as a calm, static-first system."
+        href="/projects/personal-portfolio/"
+      />
+    </div>
   </section>
 </BaseLayout>
