@@ -1,0 +1,39 @@
+:root {
+  /* ---------- Colors ---------- */
+  --color-bg: #fafaf9;
+  --color-text: #1c1e21;
+  --color-muted: #5f6368;
+  --color-accent: #5563de;
+  --color-border: rgba(28, 30, 33, 0.1);
+
+  /* ---------- Typography ---------- */
+  --font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-heading: "Source Serif 4", Georgia, serif;
+
+  --font-size-base: 18px;
+  --line-height-base: 1.65;
+
+  --font-size-sm: 0.9rem;
+  --font-size-lg: 1.2rem;
+  --font-size-xl: 1.6rem;
+  --font-size-xxl: 2.2rem;
+
+  /* ---------- Layout ---------- */
+  --max-width: 70ch;
+
+  /* ---------- Spacing (8px system) ---------- */
+  --space-1: 0.5rem;   /* 8px */
+  --space-2: 1rem;     /* 16px */
+  --space-3: 1.5rem;   /* 24px */
+  --space-4: 2rem;     /* 32px */
+  --space-5: 3rem;     /* 48px */
+  --space-6: 4rem;     /* 64px */
+
+  /* ---------- Motion ---------- */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+
+  /* ---------- Radius ---------- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+}

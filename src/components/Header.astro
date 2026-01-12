@@ -1,13 +1,39 @@
+---
+const currentPath = Astro.url.pathname;
+const isActive = (path) =>
+  currentPath === path || currentPath.startsWith(path + "/");
+---
+
 <nav aria-label="Primary">
   <div class="nav-container">
     <a href="/" class="nav-brand">Animesh Singh</a>
 
     <ul class="nav-links">
-      <li><a href="/projects/">Projects</a></li>
-      <li><a href="/photography/">Photography</a></li>
-      <li><a href="/music/">Music</a></li>
-      <li><a href="/about/">About</a></li>
-      <li><a href="/contact/">Contact</a></li>
+      <li>
+        <a href="/projects/" aria-current={isActive("/projects") ? "page" : undefined}>
+          Projects
+        </a>
+      </li>
+      <li>
+        <a href="/photography/" aria-current={isActive("/photography") ? "page" : undefined}>
+          Photography
+        </a>
+      </li>
+      <li>
+        <a href="/music/" aria-current={isActive("/music") ? "page" : undefined}>
+          Music
+        </a>
+      </li>
+      <li>
+        <a href="/about/" aria-current={isActive("/about") ? "page" : undefined}>
+          About
+        </a>
+      </li>
+      <li>
+        <a href="/contact/" aria-current={isActive("/contact") ? "page" : undefined}>
+          Contact
+        </a>
+      </li>
     </ul>
   </div>
 </nav>
