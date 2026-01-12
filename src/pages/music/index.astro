@@ -1,0 +1,88 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+
+const tracks = [
+  {
+    title: "Midnight Practice",
+    src: "/audio/track-01.mp3",
+    duration: "2:34",
+    note: "Fingerstyle improvisation, recorded late at night.",
+  },
+  {
+    title: "Morning Riff",
+    src: "/audio/track-02.mp3",
+    duration: "1:58",
+    note: "Warm-up session, minimal processing.",
+  },
+  {
+    title: "Unfinished Idea",
+    src: "/audio/track-03.mp3",
+    duration: "3:12",
+    note: "Exploring melody over rhythm.",
+  },
+];
+
+const videos = [
+  {
+    title: "Studio Session",
+    src: "/video/session-01.mp4",
+    note: "Short live take. One camera, no edits.",
+  },
+];
+---
+
+<BaseLayout
+  title="Music — Animesh Singh"
+  description="A small collection of guitar recordings and sessions. Simple, unpolished, intentional."
+>
+  <section>
+    <h1>Music</h1>
+    <p>
+      Guitar recordings and small sessions. Audio first. No autoplay.
+    </p>
+  </section>
+
+  <!-- Audio -->
+  <section>
+    <h2>Audio</h2>
+
+    <div class="music-list">
+      {tracks.map((track) => (
+        <article class="music-item">
+          <div class="music-meta">
+            <div class="music-title">{track.title}</div>
+            <div class="music-note">
+              {track.duration} · {track.note}
+            </div>
+          </div>
+
+          <audio controls preload="none">
+            <source src={track.src} type="audio/mpeg" />
+            Your browser does not support the audio element.
+          </audio>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <!-- Video (optional) -->
+  <section>
+    <h2>Video</h2>
+
+    <div class="music-list">
+      {videos.map((video) => (
+        <article class="music-item">
+          <div class="music-meta">
+            <div class="music-title">{video.title}</div>
+            <div class="music-note">{video.note}</div>
+          </div>
+
+          <video controls preload="none">
+            <source src={video.src} type="video/mp4" />
+            Your browser does not support the video element.
+          </video>
+        </article>
+      ))}
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,119 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+
+const photos = [
+  { src: "/images/photography/photo-01.jpg", caption: "Early morning light" },
+  { src: "/images/photography/photo-02.jpg", caption: "Quiet street" },
+  { src: "/images/photography/photo-03.jpg", caption: "Monsoon shadows" },
+  { src: "/images/photography/photo-04.jpg", caption: "Stillness" },
+  { src: "/images/photography/photo-05.jpg", caption: "Textures and lines" },
+  { src: "/images/photography/photo-06.jpg", caption: "Urban geometry" },
+];
+---
+
+<BaseLayout
+  title="Photography — Animesh Singh"
+  description="A small, curated selection of photographs focused on light, mood, and restraint."
+>
+  <section>
+    <h1>Photography</h1>
+    <p>
+      A curated selection. No timelines, no feeds — just finished frames.
+    </p>
+  </section>
+
+  <section>
+    <div class="photo-grid">
+      {photos.map((photo, index) => (
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          aria-label={`Open photo ${index + 1}`}
+          data-index={index}
+        >
+          <img
+            src={photo.src}
+            alt={photo.caption}
+            loading="lazy"
+          />
+        </button>
+      ))}
+    </div>
+  </section>
+
+  <!-- Lightbox -->
+  <div
+    class="lightbox"
+    role="dialog"
+    aria-hidden="true"
+    aria-label="Image viewer"
+  >
+    <div class="lightbox-content">
+      <img src="" alt="" />
+      <div class="lightbox-caption"></div>
+    </div>
+  </div>
+
+  <!-- Inline JS: safe, static, predictable -->
+  <script is:inline>
+    const photos = [
+      { src: "/images/photography/photo-01.jpg", caption: "Early morning light" },
+      { src: "/images/photography/photo-02.jpg", caption: "Quiet street" },
+      { src: "/images/photography/photo-03.jpg", caption: "Monsoon shadows" },
+      { src: "/images/photography/photo-04.jpg", caption: "Stillness" },
+      { src: "/images/photography/photo-05.jpg", caption: "Textures and lines" },
+      { src: "/images/photography/photo-06.jpg", caption: "Urban geometry" },
+    ];
+
+    const gridButtons = document.querySelectorAll(".photo-grid button");
+    const lightbox = document.querySelector(".lightbox");
+    const lightboxImg = lightbox.querySelector("img");
+    const caption = lightbox.querySelector(".lightbox-caption");
+
+    let currentIndex = 0;
+
+    function openLightbox(index) {
+    currentIndex = index;
+
+    // Reset first to avoid flashing old image
+    lightboxImg.src = "";
+    caption.textContent = "";
+
+    lightbox.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+
+    requestAnimationFrame(() => {
+        lightboxImg.src = photos[index].src;
+        lightboxImg.alt = photos[index].caption;
+        caption.textContent = photos[index].caption || "";
+    });
+    }
+
+
+    function closeLightbox() {
+      lightbox.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+    }
+
+    function showNext(delta) {
+      currentIndex = (currentIndex + delta + photos.length) % photos.length;
+      openLightbox(currentIndex);
+    }
+
+    gridButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        openLightbox(Number(btn.dataset.index));
+      });
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (lightbox.getAttribute("aria-hidden") === "true") return;
+
+      if (e.key === "Escape") closeLightbox();
+      if (e.key === "ArrowRight") showNext(1);
+      if (e.key === "ArrowLeft") showNext(-1);
+    });
+
+    lightbox.addEventListener("click", closeLightbox);
+  </script>
+</BaseLayout>
