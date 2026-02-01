@@ -1,36 +1,60 @@
 ---
-const currentPath = Astro.url.pathname;
+const base = Astro.base;
+
+// Current path, with base stripped out
+const currentPath = Astro.url.pathname.replace(base, "/");
+
+// Active link helper
 const isActive = (path) =>
   currentPath === path || currentPath.startsWith(path + "/");
 ---
 
 <nav aria-label="Primary">
   <div class="nav-container">
-    <a href="/" class="nav-brand">Animesh Singh</a>
+    <a href={base} class="nav-brand">Animesh Singh</a>
 
     <ul class="nav-links">
       <li>
-        <a href="/projects/" aria-current={isActive("/projects") ? "page" : undefined}>
+        <a
+          href={`${base}projects/`}
+          aria-current={isActive("/projects") ? "page" : undefined}
+        >
           Projects
         </a>
       </li>
+
       <li>
-        <a href="/photography/" aria-current={isActive("/photography") ? "page" : undefined}>
+        <a
+          href={`${base}photography/`}
+          aria-current={isActive("/photography") ? "page" : undefined}
+        >
           Photography
         </a>
       </li>
+
       <li>
-        <a href="/music/" aria-current={isActive("/music") ? "page" : undefined}>
+        <a
+          href={`${base}music/`}
+          aria-current={isActive("/music") ? "page" : undefined}
+        >
           Music
         </a>
       </li>
+
       <li>
-        <a href="/about/" aria-current={isActive("/about") ? "page" : undefined}>
+        <a
+          href={`${base}about/`}
+          aria-current={isActive("/about") ? "page" : undefined}
+        >
           About
         </a>
       </li>
+
       <li>
-        <a href="/contact/" aria-current={isActive("/contact") ? "page" : undefined}>
+        <a
+          href={`${base}contact/`}
+          aria-current={isActive("/contact") ? "page" : undefined}
+        >
           Contact
         </a>
       </li>
