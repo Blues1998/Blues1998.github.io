@@ -1,10 +1,13 @@
 ---
 const { title, summary, href } = Astro.props;
+const base = Astro.base;
 ---
 
 <article class="project-card">
   <h3>
-    <a href={href}>{title}</a>
+    <a href={`${base}${href.replace(/^\//, "")}`}>
+      {title}
+    </a>
   </h3>
 
   <p class="project-meta">{summary}</p>
