@@ -2,16 +2,28 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { getCollection } from "astro:content";
 
+/* Generate static paths */
 export async function getStaticPaths() {
   const projects = await getCollection("projects");
 
   return projects.map((project) => ({
     params: { slug: project.slug },
-    props: { project },
   }));
 }
 
-const { project } = Astro.props;
+/* Get current project */
+const { slug } = Astro.params;
+const projects = await getCollection("projects");
+const project = projects.find((p) => p.slug === slug);
+
+if (!project) {
+  throw new Error(`Project not found: ${slug}`);
+}
+
+const { Content } = await project.render();
+
+// Human-readable status
+const statusLabel = project.data.status.replace("-", " ");
 ---
 
 <BaseLayout
@@ -24,11 +36,28 @@ const { project } = Astro.props;
     <p class="project-meta">
       {project.data.tags.join(" · ")}
     </p>
+
+    <p class={`status status-${project.data.status}`}>
+      {statusLabel}
+    </p>
+
+    {project.data.liveUrl && (
+      <p style="margin-top: 1.5rem">
+        <a
+          href={project.data.liveUrl}
+          class="button"
+          target="_blank"
+          rel="noopener"
+        >
+          Launch App →
+        </a>
+      </p>
+    )}
   </section>
 
   <section>
     <article class="project-content">
-      <project.Content />
+      <Content />
     </article>
   </section>
 </BaseLayout>

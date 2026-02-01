@@ -8,6 +8,15 @@ const projects = defineCollection({
     tags: z.array(z.string()),
     featured: z.boolean().default(false),
     order: z.number().optional(),
+    liveUrl: z.string().refine(
+      (v) => v.startsWith("/") || v.startsWith("http"),
+      "liveUrl must be a relative or absolute URL"
+      ).optional(),
+    status: z.enum([
+        "under-development",
+        "finished",
+        "archived",
+      ]),
   }),
 });
 

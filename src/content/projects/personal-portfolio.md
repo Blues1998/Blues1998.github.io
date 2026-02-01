@@ -3,6 +3,7 @@ title: Personal Portfolio
 summary: A calm, static-first personal website built with Astro.
 tags: [solo, learning]
 featured: true
+status: under-development
 order: 2
 ---
 

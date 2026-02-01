@@ -179,23 +179,22 @@ footer {
   background: rgba(28, 30, 33, 0.04);
   font-size: var(--font-size-sm);
 }
-
 /* ---------- Photography grid ---------- */
 .photo-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
-@media (min-width: 640px) {
+@media (min-width: 768px) {
   .photo-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1400px) {
   .photo-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -213,60 +212,159 @@ footer {
   border-radius: var(--radius-sm);
 }
 
-/* ---------- Lightbox ---------- */
-.lightbox {
+/* ---------- Immersive viewer ---------- */
+.viewer {
   position: fixed;
   inset: 0;
-  background: rgba(28, 30, 33, 0.92);
+  background: rgba(20, 22, 25, 0.94);
+  backdrop-filter: blur(6px);
+  z-index: 1000;
+
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
 
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--transition-base);
 }
 
-.lightbox[aria-hidden="false"] {
+.viewer[aria-hidden="false"] {
   opacity: 1;
   pointer-events: auto;
 }
 
-.lightbox-content {
-  max-width: min(90vw, 1100px);
-  max-height: 85vh;
+/* ---------- Viewer layout ---------- */
+/* ---------- Immersive viewer ---------- */
+.viewer {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 22, 25, 0.94);
+  backdrop-filter: blur(6px);
+  z-index: 1000;
 
   display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: center;
 
-  transform: scale(0.96);
-  transition: transform var(--transition-base);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-base);
 }
 
-.lightbox[aria-hidden="false"] .lightbox-content {
-  transform: scale(1);
+.viewer[aria-hidden="false"] {
+  opacity: 1;
+  pointer-events: auto;
 }
 
-.lightbox-content img {
+/* ---------- Image container ---------- */
+.viewer-stage {
+  position: relative;
+  max-width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewer-image {
   max-width: 100%;
-  max-height: 75vh;
-
-  width: auto;
-  height: auto;
-
+  max-height: 100%;
   object-fit: contain;
   border-radius: var(--radius-sm);
 }
 
-.lightbox-caption {
-  margin-top: var(--space-2);
-  color: #eaeaea;
+/* ---------- Caption ---------- */
+.viewer-caption {
+  position: absolute;
+  bottom: -2.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(234, 234, 234, 0.85);
   font-size: var(--font-size-sm);
   text-align: center;
   max-width: 60ch;
 }
+
+/* ---------- Info toggle ---------- */
+.info-toggle {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  cursor: pointer;
+}
+
+.info-toggle:hover {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+/* ---------- Info panel ---------- */
+.info-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 320px;
+  background: rgba(28, 30, 33, 0.96);
+  color: #eaeaea;
+  padding: var(--space-4);
+  transform: translateX(100%);
+  transition: transform var(--transition-base);
+}
+
+.viewer.with-info .info-panel {
+  transform: translateX(0);
+}
+
+.info-title {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  margin-bottom: var(--space-1);
+}
+
+.info-meta {
+  font-size: var(--font-size-sm);
+  color: rgba(234, 234, 234, 0.7);
+  margin-bottom: var(--space-3);
+}
+
+.info-settings {
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+}
+
+/* ---------- Mobile ---------- */
+@media (max-width: 768px) {
+  .info-panel {
+    width: 100%;
+  }
+
+  .viewer-caption {
+    bottom: -2.8rem;
+  }
+}
+
+
+/* ---------- Mobile adjustments ---------- */
+/* @media (max-width: 768px) {
+  .viewer-inner {
+    flex-direction: column;
+    transform: none !important;
+  }
+
+  .info-panel {
+    width: 100%;
+    margin-left: 0;
+    margin-top: var(--space-3);
+  }
+} */
+
 
 /* ---------- Music list ---------- */
 .music-list {
@@ -307,4 +405,34 @@ footer {
   max-height: 60vh;
   background: #000;
   border-radius: var(--radius-sm);
+}
+
+/* Project status badges */
+
+.status {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+  text-transform: capitalize;
+}
+
+.status-under-development {
+  color: #b7791f;
+}
+
+.status-finished {
+  color: #2f855a;
+}
+
+.status-archived {
+  color: #718096;
+}
+
+/* Projects overview */
+
+.project-overview {
+  margin: 1rem 0 2rem;
+  font-size: 0.9rem;
+  opacity: 0.75;
 }
