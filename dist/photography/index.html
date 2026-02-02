@@ -1,0 +1,102 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Photography — Animesh Singh</title><meta name="description" content="A curated, immersive selection of photographs."><!-- Fonts --><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;500;600&display=swap" rel="stylesheet"><link rel="stylesheet" href="/_astro/index.DtxKAczO.css"></head> <body> <a href="#main" class="skip-link">Skip to content</a> <nav aria-label="Primary"> <div class="nav-container"> <a href="/" class="nav-brand">Animesh Singh</a> <ul class="nav-links"> <li> <a href="/projects/">
+Projects
+</a> </li> <li> <a href="/photography/" aria-current="page">
+Photography
+</a> </li> <li> <a href="/music/">
+Music
+</a> </li> <li> <a href="/about/">
+About
+</a> </li> <li> <a href="/contact/">
+Contact
+</a> </li> </ul> </div> </nav> <main id="main">  <section> <h1>Photography</h1> <p>
+Finished frames. Viewed slowly. Context available when you want it.
+</p> </section> <section> <div class="photo-grid"> <button type="button" aria-label="Open Morning Light" data-index="0"> <img src="/images/photography/photo-01.jpg" alt="Morning Light" loading="lazy"> </button><button type="button" aria-label="Open Quiet Street" data-index="1"> <img src="/images/photography/photo-02.jpg" alt="Quiet Street" loading="lazy"> </button><button type="button" aria-label="Open Monsoon Shadows" data-index="2"> <img src="/images/photography/photo-03.jpg" alt="Monsoon Shadows" loading="lazy"> </button><button type="button" aria-label="Open Monsoon Shadows" data-index="3"> <img src="/images/photography/photo-04.jpg" alt="Monsoon Shadows" loading="lazy"> </button><button type="button" aria-label="Open Monsoon Shadows" data-index="4"> <img src="/images/photography/photo-05.jpg" alt="Monsoon Shadows" loading="lazy"> </button><button type="button" aria-label="Open Monsoon Shadows" data-index="5"> <img src="/images/photography/photo-06.jpg" alt="Monsoon Shadows" loading="lazy"> </button> </div> </section>  <div class="viewer" aria-hidden="true"> <div class="viewer-stage"> <img class="viewer-image" src="" alt="" draggable="false"> <button class="info-toggle" aria-label="Toggle photo information">
+i
+</button> <div class="viewer-caption"></div> </div> <aside class="info-panel"> <div class="info-title"></div> <div class="info-meta"></div> <div class="info-settings"></div> </aside> </div> <script type="application/json" id="photo-data">[{"src":"/images/photography/photo-01.jpg","title":"Morning Light","location":"New Delhi, India","date":"Jan 2024","camera":"Sony A7III","settings":"50mm · f/1.8 · ISO 200 · 1/250"},{"src":"/images/photography/photo-02.jpg","title":"Quiet Street","location":"Gurgaon, India","date":"Feb 2024","camera":"Sony A7III","settings":"35mm · f/2 · ISO 400 · 1/125"},{"src":"/images/photography/photo-03.jpg","title":"Monsoon Shadows","location":"Bangalore, India","date":"Aug 2023","camera":"Sony A7III","settings":"85mm · f/2 · ISO 320 · 1/500"},{"src":"/images/photography/photo-04.jpg","title":"Monsoon Shadows","location":"Bangalore, India","date":"Aug 2023","camera":"Sony A7III","settings":"85mm · f/2 · ISO 320 · 1/500"},{"src":"/images/photography/photo-05.jpg","title":"Monsoon Shadows","location":"Bangalore, India","date":"Aug 2023","camera":"Sony A7III","settings":"85mm · f/2 · ISO 320 · 1/500"},{"src":"/images/photography/photo-06.jpg","title":"Monsoon Shadows","location":"Bangalore, India","date":"Aug 2023","camera":"Sony A7III","settings":"85mm · f/2 · ISO 320 · 1/500"}]</script> <script>
+  const photoData = JSON.parse(
+  document.getElementById("photo-data").textContent.trim()
+);
+
+
+
+    const viewer = document.querySelector(".viewer");
+    const viewerImage = document.querySelector(".viewer-image");
+    viewerImage.setAttribute("draggable", "false");
+
+viewer.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+});
+
+    const captionEl = document.querySelector(".viewer-caption");
+    const infoToggle = document.querySelector(".info-toggle");
+    const infoPanel = document.querySelector(".info-panel");
+
+    const titleEl = infoPanel.querySelector(".info-title");
+    const metaEl = infoPanel.querySelector(".info-meta");
+    const settingsEl = infoPanel.querySelector(".info-settings");
+
+    let currentIndex = 0;
+    let infoOpen = false;
+
+    function openViewer(index) {
+      currentIndex = index;
+      const p = photoData[index];
+
+      viewerImage.src = p.src;
+      viewerImage.alt = p.title;
+      captionEl.textContent = p.title;
+
+
+      titleEl.textContent = p.title;
+      metaEl.textContent = `${p.location} · ${p.date}`;
+      settingsEl.textContent = `${p.camera} · ${p.settings}`;
+
+      viewer.classList.remove("with-info");
+      infoOpen = false;
+
+      viewer.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeViewer() {
+      viewer.setAttribute("aria-hidden", "true");
+      viewer.classList.remove("with-info");
+      document.body.style.overflow = "";
+    }
+
+    function toggleInfo() {
+      infoOpen = !infoOpen;
+      viewer.classList.toggle("with-info", infoOpen);
+    }
+
+    document.querySelectorAll(".photo-grid button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        openViewer(Number(btn.dataset.index));
+      });
+    });
+
+    infoToggle.addEventListener("click", toggleInfo);
+
+    document.addEventListener("keydown", (e) => {
+      if (viewer.getAttribute("aria-hidden") === "true") return;
+
+      if (e.key === "Escape") closeViewer();
+      if (e.key === "i") toggleInfo();
+      if (e.key === "ArrowRight")
+        openViewer((currentIndex + 1) % photos.length);
+      if (e.key === "ArrowLeft")
+        openViewer(
+          (currentIndex - 1 + photos.length) % photos.length
+        );
+    });
+
+    infoToggle.addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleInfo();
+});
+
+  </script>  </main> <footer> <div class="footer-container"> <p> <small>© 2026 Animesh Singh</small> </p> <ul class="footer-links"> <li> <a href="mailto:youremail@example.com">Email</a> </li> <li> <a href="https://github.com/Blues1998" target="_blank" rel="noopener noreferrer">
+GitHub
+</a> </li> <li> <a href="https://www.linkedin.com/" target="_blank" rel="noopener noreferrer">
+LinkedIn
+</a> </li> </ul> </div> </footer> </body></html>
