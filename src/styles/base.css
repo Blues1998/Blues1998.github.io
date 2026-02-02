@@ -91,23 +91,6 @@ video {
   display: block;
 }
 
-/* ---------- Skip link ---------- */
-.skip-link {
-  position: absolute;
-  top: -40px;
-  left: var(--space-2);
-  background: var(--color-bg);
-  color: var(--color-text);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  z-index: 100;
-}
-
-.skip-link:focus {
-  top: var(--space-2);
-}
-
 /* ---------- Focus states ---------- */
 :focus-visible {
   outline: 2px solid var(--color-accent);
