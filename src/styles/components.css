@@ -60,13 +60,27 @@ footer {
 }
 
 .footer-links a {
+  display: flex;
+  align-items: center;
+  line-height: 1;
   color: var(--color-muted);
   font-size: var(--font-size-sm);
 }
 
+
 .footer-links a:hover {
   color: var(--color-text);
 }
+
+.footer-copy {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: 1;
+  color: var(--color-muted);
+  display: flex;
+  align-items: center;
+}
+
 
 /* ---------- Active nav link ---------- */
 .nav-links a[aria-current="page"] {
