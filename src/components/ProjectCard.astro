@@ -1,5 +1,5 @@
 ---
-const { title, summary, href } = Astro.props;
+const { title, summary, href, tech } = Astro.props;
 const base = import.meta.env.BASE_URL;
 
 // Ensure no double slashes
@@ -8,8 +8,18 @@ const resolvedHref = `${base}${href.replace(/^\//, "")}`;
 
 <article class="project-card">
   <h3>
-    <a href={resolvedHref}>{title}</a>
+    <a href={resolvedHref}>
+      {title}
+    </a>
   </h3>
 
   <p class="project-meta">{summary}</p>
+
+  {tech && tech.length > 0 && (
+    <div class="tech-badges">
+      {tech.map((t) => (
+        <span class="tech-badge">{t}</span>
+      ))}
+    </div>
+  )}
 </article>

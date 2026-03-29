@@ -2,6 +2,7 @@
 title: reqdiff
 summary: A Python linting tool that catches unused dependencies and undeclared imports across requirements files.
 tags: [Python, CLI, open-source]
+tech: [Python, CLI, PyPI]
 status: finished
 order: 4
 liveUrl: https://pypi.org/project/reqdiff/

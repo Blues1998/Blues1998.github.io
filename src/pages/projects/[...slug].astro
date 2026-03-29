@@ -41,6 +41,14 @@ const statusLabel = project.data.status.replace("-", " ");
       {statusLabel}
     </p>
 
+    {project.data.tech && project.data.tech.length > 0 && (
+      <div class="tech-badges">
+        {project.data.tech.map((t) => (
+          <span class="tech-badge">{t}</span>
+        ))}
+      </div>
+    )}
+
     {project.data.liveUrl && (
       <p style="margin-top: 1.5rem">
         <a

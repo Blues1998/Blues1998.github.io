@@ -18,6 +18,12 @@ nav {
   color: var(--color-text);
 }
 
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
 .nav-links {
   list-style: none;
   display: flex;
@@ -96,6 +102,11 @@ footer {
     gap: var(--space-2);
   }
 
+  .nav-right {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
   .nav-links {
     flex-wrap: wrap;
     gap: var(--space-2);
@@ -166,6 +177,66 @@ footer {
 .project-meta {
   font-size: var(--font-size-sm);
   color: var(--color-muted);
+}
+
+/* ---------- Tech badges ---------- */
+.tech-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: var(--space-2);
+}
+
+.tech-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  background: rgba(85, 99, 222, 0.08);
+  color: var(--color-accent);
+  border: 1px solid rgba(85, 99, 222, 0.15);
+  cursor: default;
+  transition: background var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.tech-badge:hover {
+  background: rgba(85, 99, 222, 0.15);
+  border-color: rgba(85, 99, 222, 0.3);
+}
+
+/* Filterable tech badges (projects page) */
+.tech-badge.filterable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.tech-badge.filterable.active {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+}
+
+/* Project card hidden during filter */
+.project-card.hidden {
+  display: none;
+}
+
+/* Filter bar */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: var(--space-4);
+  align-items: center;
+}
+
+.filter-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  margin-right: 0.3rem;
 }
 
 /* ---------- Project detail content ---------- */
@@ -267,7 +338,6 @@ footer {
   align-items: center;
   justify-content: center;
 }
-
 
 .viewer-image {
   max-width: 100%;

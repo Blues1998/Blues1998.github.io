@@ -1,0 +1,50 @@
+---
+/* Theme Toggle — sun/moon icon */
+---
+
+<button
+  class="theme-toggle"
+  aria-label="Toggle dark mode"
+  title="Toggle dark mode"
+>
+  <span class="theme-icon sun">☀️</span>
+  <span class="theme-icon moon">🌙</span>
+</button>
+
+<style>
+  .theme-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem;
+    font-size: 1rem;
+    line-height: 1;
+    position: relative;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .theme-icon {
+    position: absolute;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  .sun { opacity: 1; transform: rotate(0deg); }
+  .moon { opacity: 0; transform: rotate(-90deg); }
+
+  :global([data-theme="dark"]) .sun { opacity: 0; transform: rotate(90deg); }
+  :global([data-theme="dark"]) .moon { opacity: 1; transform: rotate(0deg); }
+</style>
+
+<script is:inline>
+  document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+  });
+</script>

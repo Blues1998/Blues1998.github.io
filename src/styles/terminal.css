@@ -1,0 +1,120 @@
+/* ── Terminal Easter Egg ─────────────────────────── */
+
+.terminal-page {
+  min-height: 100vh;
+  background: #0d1117;
+  color: #c9d1d9;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+  font-size: 14px;
+  line-height: 1.7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.terminal-page a.back-link {
+  color: #484f58;
+  font-size: 0.8rem;
+  text-decoration: none;
+  margin-bottom: 1.5rem;
+  transition: color 0.2s;
+}
+
+.terminal-page a.back-link:hover {
+  color: #c9d1d9;
+}
+
+.terminal {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  width: 100%;
+  max-width: 680px;
+  overflow: hidden;
+  box-shadow: 0 16px 70px rgba(0, 0, 0, 0.5);
+}
+
+.terminal-titlebar {
+  background: #21262d;
+  padding: 0.6rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid #30363d;
+}
+
+.terminal-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.terminal-dot.red { background: #ff5f57; }
+.terminal-dot.yellow { background: #febc2e; }
+.terminal-dot.green { background: #28c840; }
+
+.terminal-title {
+  flex: 1;
+  text-align: center;
+  color: #484f58;
+  font-size: 0.75rem;
+}
+
+.terminal-body {
+  padding: 1.2rem 1.4rem;
+  min-height: 300px;
+}
+
+.terminal-line {
+  min-height: 1.7em;
+  margin-bottom: 0.15rem;
+}
+
+/* ── Bash syntax colors ─────────────────────────── */
+
+.t-prompt { color: #3fb950; }                    /* $ */
+.t-command { color: #d2a8ff; }                    /* cat, ls, echo, whoami */
+.t-flag { color: #79c0ff; }                       /* -la, --help */
+.t-path { color: #ffa657; }                       /* file paths */
+.t-string { color: #a5d6ff; }                     /* quoted strings */
+.t-output { color: #8b949e; }                     /* command output */
+.t-keyword { color: #ff7b72; }                    /* export, sudo */
+.t-pipe { color: #c9d1d9; }                       /* |, >, >> */
+.t-url { color: #58a6ff; text-decoration: underline; }
+.t-number { color: #79c0ff; }                     /* numbers */
+.t-badge { font-weight: 600; }                    /* status badges */
+.t-badge.done { color: #3fb950; }
+.t-badge.wip { color: #d29922; }
+.t-comment { color: #484f58; font-style: italic; }  /* comments */
+
+/* ── Blinking cursor ────────────────────────────── */
+
+.t-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 1.15em;
+  background: #c9d1d9;
+  vertical-align: text-bottom;
+  margin-left: 1px;
+  animation: cursor-blink 1s step-end infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ── Mobile ─────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .terminal-page {
+    font-size: 12px;
+    padding: 1rem;
+  }
+
+  .terminal-body {
+    padding: 0.8rem 1rem;
+  }
+}

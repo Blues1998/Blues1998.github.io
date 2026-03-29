@@ -25,6 +25,9 @@ const statusCounts = projects.reduce(
     archived: 0,
   }
 );
+
+// Collect all unique tech tags
+const allTech = [...new Set(projects.flatMap((p) => p.data.tech || []))].sort();
 ---
 
 <BaseLayout
@@ -41,14 +44,67 @@ const statusCounts = projects.reduce(
       Archived: {statusCounts.archived}
     </p>
 
-    <div class="project-grid">
+    <!-- Tech filter -->
+    {allTech.length > 0 && (
+      <div class="filter-bar" id="filter-bar">
+        <span class="filter-label">Filter:</span>
+        {allTech.map((t) => (
+          <button class="tech-badge filterable" data-tech={t} type="button">
+            {t}
+          </button>
+        ))}
+      </div>
+    )}
+
+    <div class="project-grid" id="project-grid">
       {projects.map((project) => (
-        <ProjectCard
-          title={project.data.title}
-          summary={project.data.summary}
-          href={`/projects/${project.slug}/`}
-        />
+        <div class="project-card-wrapper" data-techs={JSON.stringify(project.data.tech || [])}>
+          <ProjectCard
+            title={project.data.title}
+            summary={project.data.summary}
+            href={`/projects/${project.slug}/`}
+            tech={project.data.tech}
+          />
+        </div>
       ))}
     </div>
   </section>
+
+  <script is:inline>
+    (() => {
+      const bar = document.getElementById("filter-bar");
+      const grid = document.getElementById("project-grid");
+      if (!bar || !grid) return;
+
+      const buttons = bar.querySelectorAll(".filterable");
+      const cards = grid.querySelectorAll(".project-card-wrapper");
+      let activeTech = null;
+
+      buttons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const tech = btn.dataset.tech;
+
+          // Toggle filter
+          if (activeTech === tech) {
+            activeTech = null;
+            btn.classList.remove("active");
+          } else {
+            buttons.forEach((b) => b.classList.remove("active"));
+            btn.classList.add("active");
+            activeTech = tech;
+          }
+
+          // Show/hide cards
+          cards.forEach((card) => {
+            const techs = JSON.parse(card.dataset.techs || "[]");
+            if (!activeTech || techs.includes(activeTech)) {
+              card.classList.remove("hidden");
+            } else {
+              card.classList.add("hidden");
+            }
+          });
+        });
+      });
+    })();
+  </script>
 </BaseLayout>

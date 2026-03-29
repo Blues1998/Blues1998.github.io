@@ -2,6 +2,7 @@
 title: Focus Reader
 summary: A stream-based reading app that presents text one word at a time to make reading possible in motion.
 tags: [React, UX, Reading]
+tech: [React, UX]
 order: 3
 status: under-development
 liveUrl: /apps/focus-reader/

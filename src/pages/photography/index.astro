@@ -132,8 +132,6 @@ const photos = [
       let currentIndex = 0;
       let infoOpen = false;
 
-      /* ── Viewer controls ─────────────────────────── */
-
       function openViewer(index) {
         currentIndex = index;
         const p = photoData[index];
@@ -173,16 +171,14 @@ const photos = [
         openViewer((currentIndex - 1 + photoData.length) % photoData.length);
       }
 
-      /* ── Grid clicks ─────────────────────────────── */
-
+      /* ── Grid clicks ─────────────────────────── */
       document.querySelectorAll(".photo-grid button").forEach((btn) => {
         btn.addEventListener("click", () => {
           openViewer(Number(btn.dataset.index));
         });
       });
 
-      /* ── Viewer buttons ──────────────────────────── */
-
+      /* ── Viewer buttons ──────────────────────── */
       infoToggle.addEventListener("click", (e) => {
         e.stopPropagation();
         toggleInfo();
@@ -193,16 +189,14 @@ const photos = [
         closeViewer();
       });
 
-      /* ── Click backdrop to close ─────────────────── */
-
+      /* ── Click backdrop to close ─────────────── */
       viewer.addEventListener("click", (e) => {
         if (e.target === viewer || e.target.classList.contains("viewer-stage")) {
           closeViewer();
         }
       });
 
-      /* ── Keyboard ────────────────────────────────── */
-
+      /* ── Keyboard ────────────────────────────── */
       document.addEventListener("keydown", (e) => {
         if (viewer.getAttribute("aria-hidden") === "true") return;
 
@@ -212,8 +206,7 @@ const photos = [
         if (e.key === "ArrowLeft") prevPhoto();
       });
 
-      /* ── Touch support ───────────────────────────── */
-
+      /* ── Touch support ───────────────────────── */
       let touchStartX = 0;
       let touchStartY = 0;
       let touchStartTime = 0;
@@ -241,29 +234,23 @@ const photos = [
           const absDx = Math.abs(dx);
           const absDy = Math.abs(dy);
 
-          // Horizontal swipe (min 50px, faster than 500ms, more horizontal than vertical)
+          // Horizontal swipe
           if (absDx > 50 && absDx > absDy && dt < 500) {
-            if (dx > 0) {
-              prevPhoto();
-            } else {
-              nextPhoto();
-            }
+            if (dx > 0) prevPhoto();
+            else nextPhoto();
             return;
           }
 
-          // Tap to close (short touch, minimal movement)
+          // Tap to close
           if (absDx < 10 && absDy < 10 && dt < 300) {
-            // Don't close if tapping on buttons
             const tag = e.target.tagName.toLowerCase();
-            if (tag !== "button") {
-              closeViewer();
-            }
+            if (tag !== "button") closeViewer();
           }
         },
         { passive: true }
       );
 
-      /* ── Disable right-click on viewer image ─────── */
+      /* ── Disable right-click ─────────────────── */
       viewerImage.addEventListener("contextmenu", (e) => {
         e.preventDefault();
       });

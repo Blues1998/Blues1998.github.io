@@ -1,0 +1,230 @@
+---
+import "../styles/tokens.css";
+import "../styles/base.css";
+import "../styles/terminal.css";
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>~/terminal — Animesh Singh</title>
+    <meta name="robots" content="noindex" />
+  </head>
+
+  <body style="margin: 0;">
+    <div class="terminal-page">
+      <a href="/" class="back-link">← back to site</a>
+
+      <div class="terminal">
+        <div class="terminal-titlebar">
+          <span class="terminal-dot red"></span>
+          <span class="terminal-dot yellow"></span>
+          <span class="terminal-dot green"></span>
+          <span class="terminal-title">animesh — zsh — 80×24</span>
+        </div>
+        <div class="terminal-body" id="terminal-body">
+          <span class="t-cursor"></span>
+        </div>
+      </div>
+    </div>
+
+    <script is:inline>
+      (() => {
+        const body = document.getElementById("terminal-body");
+        const cursor = body.querySelector(".t-cursor");
+
+        const lines = [
+          {
+            delay: 600,
+            parts: [{ cls: "t-prompt", text: "$ " }, { cls: "t-command", text: "whoami" }],
+          },
+          {
+            delay: 100,
+            speed: 22,
+            parts: [{ cls: "t-output", text: "animesh — software engineer, photographer, musician" }],
+          },
+          { delay: 350, parts: [] },
+          {
+            delay: 200,
+            parts: [{ cls: "t-prompt", text: "$ " }, { cls: "t-command", text: "cat " }, { cls: "t-path", text: "about.txt" }],
+          },
+          {
+            delay: 100,
+            speed: 18,
+            parts: [{ cls: "t-output", text: "Building calm, reliable systems." }],
+          },
+          {
+            delay: 0,
+            speed: 18,
+            parts: [{ cls: "t-output", text: "Bias toward simplicity. Own systems end-to-end." }],
+          },
+          { delay: 350, parts: [] },
+          {
+            delay: 200,
+            parts: [{ cls: "t-prompt", text: "$ " }, { cls: "t-command", text: "ls " }, { cls: "t-flag", text: "-la " }, { cls: "t-path", text: "~/projects/" }],
+          },
+          {
+            delay: 100,
+            parts: [{ cls: "t-output", text: "total 4" }],
+          },
+          {
+            delay: 0,
+            parts: [
+              { cls: "t-output", text: "drwxr-xr-x  staxls/          " },
+              { cls: "t-badge done", text: "finished" },
+              { cls: "t-output", text: "   " },
+              { cls: "t-comment", text: "# Python, Robot Framework" },
+            ],
+          },
+          {
+            delay: 0,
+            parts: [
+              { cls: "t-output", text: "drwxr-xr-x  reqdiff/         " },
+              { cls: "t-badge done", text: "finished" },
+              { cls: "t-output", text: "   " },
+              { cls: "t-comment", text: "# Python, CLI, PyPI" },
+            ],
+          },
+          {
+            delay: 0,
+            parts: [
+              { cls: "t-output", text: "drwxr-xr-x  portfolio/       " },
+              { cls: "t-badge wip", text: "in-dev" },
+              { cls: "t-output", text: "      " },
+              { cls: "t-comment", text: "# Astro, React, TypeScript" },
+            ],
+          },
+          {
+            delay: 0,
+            parts: [
+              { cls: "t-output", text: "drwxr-xr-x  focus-reader/    " },
+              { cls: "t-badge wip", text: "in-dev" },
+              { cls: "t-output", text: "      " },
+              { cls: "t-comment", text: "# React, UX" },
+            ],
+          },
+          { delay: 350, parts: [] },
+          {
+            delay: 200,
+            parts: [{ cls: "t-prompt", text: "$ " }, { cls: "t-command", text: "echo " }, { cls: "t-string", text: "\"$CONTACT\"" }],
+          },
+          {
+            delay: 100,
+            parts: [{ cls: "t-output", text: "📧 " }, { cls: "t-output", text: "animesh98388@gmail.com" }],
+          },
+          {
+            delay: 0,
+            parts: [{ cls: "t-output", text: "🐙 " }, { cls: "t-url", text: "github.com/Blues1998" }],
+          },
+          {
+            delay: 0,
+            parts: [{ cls: "t-output", text: "💼 " }, { cls: "t-url", text: "linkedin.com/in/animesh-singh-profile" }],
+          },
+          { delay: 350, parts: [] },
+          {
+            delay: 400,
+            speed: 25,
+            parts: [{ cls: "t-comment", text: "# currently exploring: agentic AI" }],
+          },
+          {
+            delay: 200,
+            parts: [{ cls: "t-prompt", text: "$ " }, { cls: "t-cursor", text: "" }],
+          },
+        ];
+
+        let lineIndex = 0;
+
+        function typeLine() {
+          if (lineIndex >= lines.length) return;
+
+          const line = lines[lineIndex];
+          const speed = line.speed || 25;
+
+          setTimeout(() => {
+            // Remove cursor from previous line
+            const existingCursor = body.querySelector(".t-cursor");
+            if (existingCursor && existingCursor.parentElement !== body) {
+              existingCursor.remove();
+            }
+
+            const lineEl = document.createElement("div");
+            lineEl.className = "terminal-line";
+            body.appendChild(lineEl);
+
+            if (line.parts.length === 0) {
+              // Empty spacer line
+              lineIndex++;
+              typeLine();
+              return;
+            }
+
+            // Flatten all parts into characters with their classes
+            const chars = [];
+            for (const part of line.parts) {
+              for (const ch of part.text) {
+                chars.push({ ch, cls: part.cls });
+              }
+            }
+
+            // Is this a static line (no typing animation)?
+            const isStatic = line.delay === 0 && line.speed === undefined;
+
+            if (isStatic) {
+              // Render all at once
+              for (const { ch, cls } of chars) {
+                if (cls === "t-cursor") {
+                  const c = document.createElement("span");
+                  c.className = "t-cursor";
+                  lineEl.appendChild(c);
+                } else {
+                  const span = document.createElement("span");
+                  span.className = cls;
+                  span.textContent = ch;
+                  lineEl.appendChild(span);
+                }
+              }
+              lineIndex++;
+              typeLine();
+            } else {
+              // Typewriter effect
+              let charIndex = 0;
+
+              function typeChar() {
+                if (charIndex >= chars.length) {
+                  // Add blinking cursor at end
+                  const c = document.createElement("span");
+                  c.className = "t-cursor";
+                  lineEl.appendChild(c);
+
+                  lineIndex++;
+                  typeLine();
+                  return;
+                }
+
+                const { ch, cls } = chars[charIndex];
+                if (cls === "t-cursor") {
+                  const c = document.createElement("span");
+                  c.className = "t-cursor";
+                  lineEl.appendChild(c);
+                } else {
+                  const span = document.createElement("span");
+                  span.className = cls;
+                  span.textContent = ch;
+                  lineEl.appendChild(span);
+                }
+
+                charIndex++;
+                setTimeout(typeChar, speed);
+              }
+
+              typeChar();
+            }
+          }, line.delay);
+        }
+
+        typeLine();
+      })();
+    </script>
+  </body>
+</html>

@@ -6,6 +6,7 @@ import Footer from "../components/Footer.astro";
 import "../styles/tokens.css";
 import "../styles/base.css";
 import "../styles/components.css";
+import "../styles/dark.css";
 
 const {
   title = "Animesh Singh",
@@ -21,6 +22,20 @@ const socialImage = new URL("/images/og-default.png", Astro.site);
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Theme init (must be first in head to prevent FOUC) -->
+    <script is:inline>
+      (function() {
+        try {
+          var t = localStorage.getItem("theme");
+          if (t === "dark" || t === "light") {
+            document.documentElement.setAttribute("data-theme", t);
+          } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+            document.documentElement.setAttribute("data-theme", "dark");
+          }
+        } catch(e) {}
+      })();
+    </script>
 
     <title>{title}</title>
     <meta name="description" content={description} />
@@ -69,5 +84,17 @@ const socialImage = new URL("/images/og-default.png", Astro.site);
     </main>
 
     <Footer />
+
+    <!-- Hidden terminal trigger -->
+    <script is:inline>
+      document.addEventListener("keydown", function(e) {
+        if (e.key === "~" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          var tag = (e.target.tagName || "").toLowerCase();
+          if (tag !== "input" && tag !== "textarea" && !e.target.isContentEditable) {
+            window.location.href = "/terminal/";
+          }
+        }
+      });
+    </script>
   </body>
 </html>

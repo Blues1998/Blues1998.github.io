@@ -2,6 +2,7 @@
 title: STAXLS
 summary: Excel-driven test automation tool used in production environments.
 tags: [solo, production]
+tech: [Python, Robot Framework]
 featured: true
 status: finished
 order: 1
