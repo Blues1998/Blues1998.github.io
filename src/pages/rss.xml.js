@@ -1,17 +1,18 @@
 import rss from "@astrojs/rss";
-import { getCollection } from "astro:content";
+import { getPublicRepos, repoSlug } from "../lib/github";
 
 export async function GET(context) {
-  const projects = await getCollection("projects");
+  const repos = await getPublicRepos();
 
   return rss({
     title: "Animesh Singh",
     description: "Engineer. Photographer. Musician.",
     site: context.site,
-    items: projects.map((project) => ({
-      title: project.data.title,
-      description: project.data.summary,
-      link: `/projects/${project.slug}/`,
+    items: repos.map((repo) => ({
+      title: repo.name,
+      description: repo.description ?? repo.name,
+      link: `/projects/${repoSlug(repo)}/`,
+      pubDate: new Date(repo.pushed_at),
     })),
     customData: `<language>en-us</language>`,
   });

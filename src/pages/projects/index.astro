@@ -1,50 +1,31 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import ProjectCard from "../../components/ProjectCard.astro";
-import { getCollection } from "astro:content";
+import { getPublicRepos, repoSlug, repoTech } from "../../lib/github";
 
-const projects = await getCollection("projects");
+const repos = await getPublicRepos();
 
-// Sort: explicit order → title
-projects.sort((a, b) => {
-  if (a.data.order && b.data.order) {
-    return a.data.order - b.data.order;
-  }
-  return a.data.title.localeCompare(b.data.title);
+// Sort: stars descending, then by most recently pushed
+repos.sort((a, b) => {
+  if (b.stargazers_count !== a.stargazers_count) return b.stargazers_count - a.stargazers_count;
+  return new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime();
 });
 
-// Status counts
-const statusCounts = projects.reduce(
-  (acc, project) => {
-    acc[project.data.status]++;
-    return acc;
-  },
-  {
-    "under-development": 0,
-    finished: 0,
-    archived: 0,
-  }
-);
-
-// Collect all unique tech tags
-const allTech = [...new Set(projects.flatMap((p) => p.data.tech || []))].sort();
+// Collect all unique tech tags across repos
+const allTech = [...new Set(repos.flatMap(repoTech))].sort();
 ---
 
 <BaseLayout
   title="Projects — Animesh Singh"
-  description="Selected engineering projects with context, trade-offs, and reflections."
+  description="Public engineering projects on GitHub."
 >
   <section>
     <h1>Projects</h1>
 
     <p class="project-overview">
-      Total: {projects.length} ·
-      Finished: {statusCounts.finished} ·
-      Under development: {statusCounts["under-development"]} ·
-      Archived: {statusCounts.archived}
+      {repos.length} public {repos.length === 1 ? "repo" : "repos"} on GitHub
     </p>
 
-    <!-- Tech filter -->
     {allTech.length > 0 && (
       <div class="filter-bar" id="filter-bar">
         <span class="filter-label">Filter:</span>
@@ -57,13 +38,16 @@ const allTech = [...new Set(projects.flatMap((p) => p.data.tech || []))].sort();
     )}
 
     <div class="project-grid" id="project-grid">
-      {projects.map((project) => (
-        <div class="project-card-wrapper" data-techs={JSON.stringify(project.data.tech || [])}>
+      {repos.map((repo) => (
+        <div
+          class="project-card-wrapper"
+          data-techs={JSON.stringify(repoTech(repo))}
+        >
           <ProjectCard
-            title={project.data.title}
-            summary={project.data.summary}
-            href={`/projects/${project.slug}/`}
-            tech={project.data.tech}
+            title={repo.name}
+            summary={repo.description ?? "No description."}
+            href={`/projects/${repoSlug(repo)}/`}
+            tech={repoTech(repo)}
           />
         </div>
       ))}
@@ -83,8 +67,6 @@ const allTech = [...new Set(projects.flatMap((p) => p.data.tech || []))].sort();
       buttons.forEach((btn) => {
         btn.addEventListener("click", () => {
           const tech = btn.dataset.tech;
-
-          // Toggle filter
           if (activeTech === tech) {
             activeTech = null;
             btn.classList.remove("active");
@@ -93,15 +75,9 @@ const allTech = [...new Set(projects.flatMap((p) => p.data.tech || []))].sort();
             btn.classList.add("active");
             activeTech = tech;
           }
-
-          // Show/hide cards
           cards.forEach((card) => {
             const techs = JSON.parse(card.dataset.techs || "[]");
-            if (!activeTech || techs.includes(activeTech)) {
-              card.classList.remove("hidden");
-            } else {
-              card.classList.add("hidden");
-            }
+            card.classList.toggle("hidden", !!(activeTech && !techs.includes(activeTech)));
           });
         });
       });

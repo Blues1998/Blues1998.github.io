@@ -1,71 +1,70 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import { getCollection } from "astro:content";
+import { getPublicRepos, getRepoReadme, repoSlug, repoTech } from "../../lib/github";
+import { marked } from "marked";
 
-/* Generate static paths */
 export async function getStaticPaths() {
-  const projects = await getCollection("projects");
+  const repos = await getPublicRepos();
 
-  return projects.map((project) => ({
-    params: { slug: project.slug },
-  }));
+  return await Promise.all(
+    repos.map(async (repo) => {
+      const readmeMd = await getRepoReadme(repo);
+      const readmeHtml = readmeMd ? await marked(readmeMd) : null;
+      return {
+        params: { slug: repoSlug(repo) },
+        props: { repo, readmeHtml },
+      };
+    })
+  );
 }
 
-/* Get current project */
-const { slug } = Astro.params;
-const projects = await getCollection("projects");
-const project = projects.find((p) => p.slug === slug);
-
-if (!project) {
-  throw new Error(`Project not found: ${slug}`);
-}
-
-const { Content } = await project.render();
-
-// Human-readable status
-const statusLabel = project.data.status.replace("-", " ");
+const { repo, readmeHtml } = Astro.props;
+const tech = repoTech(repo);
 ---
 
 <BaseLayout
-  title={`${project.data.title} — Animesh Singh`}
-  description={project.data.summary}
+  title={`${repo.name} — Animesh Singh`}
+  description={repo.description ?? repo.name}
 >
   <section>
-    <h1>{project.data.title}</h1>
+    <h1>{repo.name}</h1>
 
-    <p class="project-meta">
-      {project.data.tags.join(" · ")}
-    </p>
+    {repo.description && <p>{repo.description}</p>}
 
-    <p class={`status status-${project.data.status}`}>
-      {statusLabel}
-    </p>
-
-    {project.data.tech && project.data.tech.length > 0 && (
+    {tech.length > 0 && (
       <div class="tech-badges">
-        {project.data.tech.map((t) => (
-          <span class="tech-badge">{t}</span>
-        ))}
+        {tech.map((t) => <span class="tech-badge">{t}</span>)}
       </div>
     )}
 
-    {project.data.liveUrl && (
-      <p style="margin-top: 1.5rem">
-        <a
-          href={project.data.liveUrl}
-          class="button"
-          target="_blank"
-          rel="noopener"
-        >
-          Launch App →
-        </a>
-      </p>
-    )}
+    <p class="repo-meta">
+      {repo.stargazers_count > 0 && (
+        <span>★ {repo.stargazers_count}</span>
+      )}
+      {repo.stargazers_count > 0 && (repo.homepage || repo.html_url) && (
+        <span> · </span>
+      )}
+      <a href={repo.html_url} target="_blank" rel="noopener">
+        View on GitHub →
+      </a>
+      {repo.homepage && (
+        <>
+          {" · "}
+          <a href={repo.homepage} target="_blank" rel="noopener">
+            Live →
+          </a>
+        </>
+      )}
+    </p>
   </section>
 
-  <section>
-    <article class="project-content">
-      <Content />
-    </article>
-  </section>
+  {readmeHtml ? (
+    <section>
+      <article class="project-content readme-content" set:html={readmeHtml} />
+    </section>
+  ) : (
+    <section>
+      <p class="muted">No README found for this repository.</p>
+    </section>
+  )}
 </BaseLayout>
