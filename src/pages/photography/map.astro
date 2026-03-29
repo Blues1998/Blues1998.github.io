@@ -1,0 +1,110 @@
+---
+import { getImage } from "astro:assets";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import PhotoGlobe from "../../components/PhotoGlobe";
+import metadataList from "../../assets/photography/metadata.json";
+
+const imageModules = import.meta.glob(
+  "../../assets/photography/*.{jpg,jpeg,png,webp}",
+  { eager: true }
+);
+
+const imageByFilename = Object.fromEntries(
+  Object.entries(imageModules).map(([path, mod]) => [
+    path.split("/").at(-1),
+    (mod as { default: ImageMetadata }).default,
+  ])
+);
+
+const photos = await Promise.all(
+  metadataList.map(async (meta, index) => {
+    const raw = imageByFilename[meta.file];
+    const [thumb, viewer] = await Promise.all([
+      getImage({ src: raw, width: 320,  format: "webp", quality: 70 }),
+      getImage({ src: raw, width: 1920, format: "webp", quality: 82 }),
+    ]);
+    return { ...meta, thumbSrc: thumb.src, viewerSrc: viewer.src, index };
+  })
+);
+---
+
+<BaseLayout
+  title="Photography Map — Animesh Singh"
+  description="Photos from around the world, mapped."
+>
+  <section class="map-header">
+    <div class="map-header-left">
+      <h1>Photography</h1>
+      <nav class="photo-nav" aria-label="Photography views">
+        <a href="/photography">Grid</a>
+        <a href="/photography/map" class="active" aria-current="page">Map</a>
+      </nav>
+    </div>
+    <p class="map-hint">Drag to spin · Click a photo to expand</p>
+  </section>
+
+  <div class="globe-container">
+    <PhotoGlobe client:only="react" photos={photos} />
+  </div>
+</BaseLayout>
+
+<style>
+  .map-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-3);
+  }
+
+  .map-header-left {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+  }
+
+  .map-header h1 {
+    margin: 0;
+  }
+
+  .photo-nav {
+    display: flex;
+    gap: var(--space-2);
+    font-size: var(--font-size-sm);
+  }
+
+  .photo-nav a {
+    color: var(--color-muted);
+    text-decoration: none;
+    padding-bottom: 2px;
+    border-bottom: 1px solid transparent;
+    transition: color var(--transition-fast), border-color var(--transition-fast);
+  }
+
+  .photo-nav a:hover {
+    color: var(--color-text);
+  }
+
+  .photo-nav a.active {
+    color: var(--color-text);
+    border-bottom-color: var(--color-accent);
+  }
+
+  .map-hint {
+    font-size: var(--font-size-sm);
+    color: var(--color-muted);
+    margin: 0;
+  }
+
+  .globe-container {
+    width: 100vw;
+    height: calc(100dvh - 160px);
+    min-height: 500px;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    overflow: hidden;
+    background: #0f1117;
+  }
+</style>

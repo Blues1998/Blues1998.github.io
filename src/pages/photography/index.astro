@@ -35,7 +35,15 @@ const photos = await Promise.all(
   description="A curated, immersive selection of photographs."
 >
   <section>
-    <h1>Photography</h1>
+    <div class="photo-header">
+      <div class="photo-header-left">
+        <h1>Photography</h1>
+        <nav class="photo-nav" aria-label="Photography views">
+          <a href="/photography" class="active" aria-current="page">Grid</a>
+          <a href="/photography/map">Map</a>
+        </nav>
+      </div>
+    </div>
     <p>
       Finished frames. Viewed slowly. Context available when you want it.
     </p>
@@ -236,6 +244,60 @@ const photos = await Promise.all(
       viewerImage.addEventListener("contextmenu", (e) => {
         e.preventDefault();
       });
+
+      /* ── Deep-link: ?open=N ──────────────────── */
+      const params = new URLSearchParams(window.location.search);
+      const openParam = params.get("open");
+      if (openParam !== null) {
+        const idx = parseInt(openParam, 10);
+        if (!isNaN(idx) && idx >= 0 && idx < photoData.length) {
+          openViewer(idx);
+        }
+      }
     })();
   </script>
 </BaseLayout>
+
+<style>
+  .photo-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-bottom: var(--space-1);
+  }
+
+  .photo-header-left {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+  }
+
+  .photo-header h1 {
+    margin: 0;
+  }
+
+  .photo-nav {
+    display: flex;
+    gap: var(--space-2);
+    font-size: var(--font-size-sm);
+  }
+
+  .photo-nav a {
+    color: var(--color-muted);
+    text-decoration: none;
+    padding-bottom: 2px;
+    border-bottom: 1px solid transparent;
+    transition: color var(--transition-fast), border-color var(--transition-fast);
+  }
+
+  .photo-nav a:hover {
+    color: var(--color-text);
+  }
+
+  .photo-nav a.active {
+    color: var(--color-text);
+    border-bottom-color: var(--color-accent);
+  }
+</style>

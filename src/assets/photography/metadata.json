@@ -1,48 +1,60 @@
 [
   {
     "file": "photo-01.jpg",
-    "title": "Morning Light",
-    "location": "New Delhi, India",
+    "title": "Tired dog",
+    "location": "Gangtok, India",
+    "lat": 27.3389,
+    "lng": 88.6065,
     "date": "Jan 2024",
     "camera": "Sony A7III",
     "settings": "50mm · f/1.8 · ISO 200 · 1/250"
   },
   {
     "file": "photo-02.jpg",
-    "title": "Quiet Street",
-    "location": "Gurgaon, India",
+    "title": "Beach bod",
+    "location": "Goa, India",
+    "lat": 15.2993,
+    "lng": 74.1240,
     "date": "Feb 2024",
     "camera": "Sony A7III",
     "settings": "35mm · f/2 · ISO 400 · 1/125"
   },
   {
     "file": "photo-03.jpg",
-    "title": "Monsoon Shadows",
-    "location": "Bangalore, India",
+    "title": "Red skies",
+    "location": "Tosh, India",
+    "lat": 32.0781,
+    "lng": 77.3397,
     "date": "Aug 2023",
     "camera": "Sony A7III",
     "settings": "85mm · f/2 · ISO 320 · 1/500"
   },
   {
     "file": "photo-04.jpg",
-    "title": "Monsoon Shadows",
-    "location": "Bangalore, India",
+    "title": "Quiet strength",
+    "location": "Gangtok, India",
+    "lat": 27.3389,
+    "lng": 88.6065,
     "date": "Aug 2023",
     "camera": "Sony A7III",
     "settings": "85mm · f/2 · ISO 320 · 1/500"
   },
   {
     "file": "photo-05.jpg",
-    "title": "Monsoon Shadows",
-    "location": "Bangalore, India",
+    "title": "Eye contact",
+    "location": "Manali, India",
+    "lat": 32.2432,
+    "lng": 77.1892,
     "date": "Aug 2023",
     "camera": "Sony A7III",
     "settings": "85mm · f/2 · ISO 320 · 1/500"
   },
   {
     "file": "photo-06.jpg",
-    "title": "Monsoon Shadows",
-    "location": "Bangalore, India",
+    "title": "Desolation",
+    "location": "Gangtok, India",
+    "lat": 27.3389,
+    "lng": 88.6065,
     "date": "Aug 2023",
     "camera": "Sony A7III",
     "settings": "85mm · f/2 · ISO 320 · 1/500"
