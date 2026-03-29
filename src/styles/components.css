@@ -220,7 +220,7 @@ footer {
 }
 
 /* Project card hidden during filter */
-.project-card.hidden {
+.project-card-wrapper.hidden {
   display: none;
 }
 
