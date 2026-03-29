@@ -1,56 +1,33 @@
 ---
+import { getImage } from "astro:assets";
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import metadataList from "../../assets/photography/metadata.json";
 
-const photos = [
-  {
-    src: "/images/photography/photo-01.jpg",
-    title: "Morning Light",
-    location: "New Delhi, India",
-    date: "Jan 2024",
-    camera: "Sony A7III",
-    settings: "50mm · f/1.8 · ISO 200 · 1/250",
-  },
-  {
-    src: "/images/photography/photo-02.jpg",
-    title: "Quiet Street",
-    location: "Gurgaon, India",
-    date: "Feb 2024",
-    camera: "Sony A7III",
-    settings: "35mm · f/2 · ISO 400 · 1/125",
-  },
-  {
-    src: "/images/photography/photo-03.jpg",
-    title: "Monsoon Shadows",
-    location: "Bangalore, India",
-    date: "Aug 2023",
-    camera: "Sony A7III",
-    settings: "85mm · f/2 · ISO 320 · 1/500",
-  },
-  {
-    src: "/images/photography/photo-04.jpg",
-    title: "Monsoon Shadows",
-    location: "Bangalore, India",
-    date: "Aug 2023",
-    camera: "Sony A7III",
-    settings: "85mm · f/2 · ISO 320 · 1/500",
-  },
-  {
-    src: "/images/photography/photo-05.jpg",
-    title: "Monsoon Shadows",
-    location: "Bangalore, India",
-    date: "Aug 2023",
-    camera: "Sony A7III",
-    settings: "85mm · f/2 · ISO 320 · 1/500",
-  },
-  {
-    src: "/images/photography/photo-06.jpg",
-    title: "Monsoon Shadows",
-    location: "Bangalore, India",
-    date: "Aug 2023",
-    camera: "Sony A7III",
-    settings: "85mm · f/2 · ISO 320 · 1/500",
-  },
-];
+// Dynamically discover all images — no filenames hard-coded
+const imageModules = import.meta.glob(
+  "../../assets/photography/*.{jpg,jpeg,png,webp}",
+  { eager: true }
+);
+
+// Build a filename → module map
+const imageByFilename = Object.fromEntries(
+  Object.entries(imageModules).map(([path, mod]) => [
+    path.split("/").at(-1),
+    (mod as { default: ImageMetadata }).default,
+  ])
+);
+
+// Generate two optimized WebP variants for each entry in metadata.json
+const photos = await Promise.all(
+  metadataList.map(async (meta) => {
+    const raw = imageByFilename[meta.file];
+    const [thumb, viewer] = await Promise.all([
+      getImage({ src: raw, width: 800,  format: "webp", quality: 75 }),
+      getImage({ src: raw, width: 1920, format: "webp", quality: 82 }),
+    ]);
+    return { ...meta, thumbSrc: thumb.src, viewerSrc: viewer.src };
+  })
+);
 ---
 
 <BaseLayout
@@ -73,11 +50,11 @@ const photos = [
           data-index={index}
         >
           <img
-            src={`${photo.src}?w=600&q=75`}
+            src={photo.thumbSrc}
             alt={photo.title}
-            loading="lazy"
-            width="600"
-            height="400"
+            loading={index === 0 ? "eager" : "lazy"}
+            width="800"
+            height="534"
           />
         </button>
       ))}
@@ -107,6 +84,7 @@ const photos = [
   </div>
 
   <script
+    is:inline
     type="application/json"
     id="photo-data"
     set:html={JSON.stringify(photos)}
@@ -136,7 +114,11 @@ const photos = [
         currentIndex = index;
         const p = photoData[index];
 
-        viewerImage.src = p.src;
+        viewerImage.classList.add("is-loading");
+        viewerImage.onload  = () => viewerImage.classList.remove("is-loading");
+        viewerImage.onerror = () => viewerImage.classList.remove("is-loading");
+
+        viewerImage.src = p.viewerSrc;
         viewerImage.alt = p.title;
         captionEl.textContent = p.title;
 

@@ -1,0 +1,50 @@
+[
+  {
+    "file": "photo-01.jpg",
+    "title": "Morning Light",
+    "location": "New Delhi, India",
+    "date": "Jan 2024",
+    "camera": "Sony A7III",
+    "settings": "50mm · f/1.8 · ISO 200 · 1/250"
+  },
+  {
+    "file": "photo-02.jpg",
+    "title": "Quiet Street",
+    "location": "Gurgaon, India",
+    "date": "Feb 2024",
+    "camera": "Sony A7III",
+    "settings": "35mm · f/2 · ISO 400 · 1/125"
+  },
+  {
+    "file": "photo-03.jpg",
+    "title": "Monsoon Shadows",
+    "location": "Bangalore, India",
+    "date": "Aug 2023",
+    "camera": "Sony A7III",
+    "settings": "85mm · f/2 · ISO 320 · 1/500"
+  },
+  {
+    "file": "photo-04.jpg",
+    "title": "Monsoon Shadows",
+    "location": "Bangalore, India",
+    "date": "Aug 2023",
+    "camera": "Sony A7III",
+    "settings": "85mm · f/2 · ISO 320 · 1/500"
+  },
+  {
+    "file": "photo-05.jpg",
+    "title": "Monsoon Shadows",
+    "location": "Bangalore, India",
+    "date": "Aug 2023",
+    "camera": "Sony A7III",
+    "settings": "85mm · f/2 · ISO 320 · 1/500"
+  },
+  {
+    "file": "photo-06.jpg",
+    "title": "Monsoon Shadows",
+    "location": "Bangalore, India",
+    "date": "Aug 2023",
+    "camera": "Sony A7III",
+    "settings": "85mm · f/2 · ISO 320 · 1/500"
+  }
+]

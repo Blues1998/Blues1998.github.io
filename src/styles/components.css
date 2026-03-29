@@ -348,6 +348,12 @@ footer {
   -webkit-user-drag: none;
 }
 
+.viewer-image.is-loading {
+  opacity: 0.2;
+  filter: blur(8px);
+  transition: opacity 0.4s ease, filter 0.4s ease;
+}
+
 /* ---------- Caption ---------- */
 .viewer-caption {
   position: absolute;
