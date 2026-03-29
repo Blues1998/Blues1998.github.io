@@ -24,7 +24,6 @@ import "../styles/terminal.css";
           <span class="terminal-title">animesh — zsh — 80×24</span>
         </div>
         <div class="terminal-body" id="terminal-body">
-          <span class="t-cursor"></span>
         </div>
       </div>
     </div>
@@ -142,11 +141,8 @@ import "../styles/terminal.css";
           const speed = line.speed || 25;
 
           setTimeout(() => {
-            // Remove cursor from previous line
-            const existingCursor = body.querySelector(".t-cursor");
-            if (existingCursor && existingCursor.parentElement !== body) {
-              existingCursor.remove();
-            }
+            // Remove all cursors from previous lines
+            body.querySelectorAll(".t-cursor").forEach(c => c.remove());
 
             const lineEl = document.createElement("div");
             lineEl.className = "terminal-line";
