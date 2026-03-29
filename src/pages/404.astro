@@ -1,0 +1,41 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="404 — Animesh Singh"
+  description="Page not found."
+>
+  <section class="not-found">
+    <h1>404</h1>
+    <p>This page doesn't exist — or it moved without leaving a note.</p>
+    <div class="button-row">
+      <a href="/" class="button">Back home</a>
+      <a href="/projects/" class="button">View projects</a>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .not-found {
+    min-height: 50vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  .not-found h1 {
+    font-size: 6rem;
+    line-height: 1;
+    margin-bottom: var(--space-2);
+    color: var(--color-muted);
+    opacity: 0.3;
+  }
+
+  .not-found p {
+    font-size: var(--font-size-lg);
+    color: var(--color-muted);
+    margin-bottom: var(--space-4);
+  }
+</style>

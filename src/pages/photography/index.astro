@@ -72,123 +72,201 @@ const photos = [
           aria-label={`Open ${photo.title}`}
           data-index={index}
         >
-          <img src={photo.src} alt={photo.title} loading="lazy" />
+          <img
+            src={`${photo.src}?w=600&q=75`}
+            alt={photo.title}
+            loading="lazy"
+            width="600"
+            height="400"
+          />
         </button>
       ))}
     </div>
   </section>
 
-<!-- Immersive viewer -->
-<div class="viewer" aria-hidden="true">
-  <div class="viewer-stage">
-    <img class="viewer-image" src="" alt="" draggable="false" />
+  <!-- Immersive viewer -->
+  <div class="viewer" aria-hidden="true" role="dialog" aria-label="Photo viewer">
+    <div class="viewer-stage">
+      <img class="viewer-image" src="" alt="" draggable="false" />
+      <div class="viewer-caption"></div>
+    </div>
 
-    <button
-      class="info-toggle"
-      aria-label="Toggle photo information"
-    >
+    <button class="info-toggle" aria-label="Toggle photo information" type="button">
       i
     </button>
 
-    <div class="viewer-caption"></div>
+    <button class="viewer-close" aria-label="Close viewer" type="button">
+      ✕
+    </button>
+
+    <aside class="info-panel">
+      <div class="info-title"></div>
+      <div class="info-meta"></div>
+      <div class="info-settings"></div>
+    </aside>
   </div>
 
-  <aside class="info-panel">
-    <div class="info-title"></div>
-    <div class="info-meta"></div>
-    <div class="info-settings"></div>
-  </aside>
-</div>
-
-
-<script
-  type="application/json"
-  id="photo-data"
-  set:html={JSON.stringify(photos)}
-></script>
+  <script
+    type="application/json"
+    id="photo-data"
+    set:html={JSON.stringify(photos)}
+  ></script>
 
   <script is:inline>
-  const photoData = JSON.parse(
-  document.getElementById("photo-data").textContent.trim()
-);
+    (() => {
+      const photoData = JSON.parse(
+        document.getElementById("photo-data").textContent.trim()
+      );
 
+      const viewer = document.querySelector(".viewer");
+      const viewerImage = document.querySelector(".viewer-image");
+      const captionEl = document.querySelector(".viewer-caption");
+      const infoToggle = document.querySelector(".info-toggle");
+      const infoPanel = document.querySelector(".info-panel");
+      const closeBtn = document.querySelector(".viewer-close");
 
+      const titleEl = infoPanel.querySelector(".info-title");
+      const metaEl = infoPanel.querySelector(".info-meta");
+      const settingsEl = infoPanel.querySelector(".info-settings");
 
-    const viewer = document.querySelector(".viewer");
-    const viewerImage = document.querySelector(".viewer-image");
-    viewerImage.setAttribute("draggable", "false");
+      let currentIndex = 0;
+      let infoOpen = false;
 
-viewer.addEventListener("contextmenu", (e) => {
-  e.preventDefault();
-});
+      /* ── Viewer controls ─────────────────────────── */
 
-    const captionEl = document.querySelector(".viewer-caption");
-    const infoToggle = document.querySelector(".info-toggle");
-    const infoPanel = document.querySelector(".info-panel");
+      function openViewer(index) {
+        currentIndex = index;
+        const p = photoData[index];
 
-    const titleEl = infoPanel.querySelector(".info-title");
-    const metaEl = infoPanel.querySelector(".info-meta");
-    const settingsEl = infoPanel.querySelector(".info-settings");
+        viewerImage.src = p.src;
+        viewerImage.alt = p.title;
+        captionEl.textContent = p.title;
 
-    let currentIndex = 0;
-    let infoOpen = false;
+        titleEl.textContent = p.title;
+        metaEl.textContent = `${p.location} · ${p.date}`;
+        settingsEl.textContent = `${p.camera} · ${p.settings}`;
 
-    function openViewer(index) {
-      currentIndex = index;
-      const p = photoData[index];
+        infoOpen = false;
+        viewer.classList.remove("with-info");
 
-      viewerImage.src = p.src;
-      viewerImage.alt = p.title;
-      captionEl.textContent = p.title;
+        viewer.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+      }
 
+      function closeViewer() {
+        viewer.setAttribute("aria-hidden", "true");
+        viewer.classList.remove("with-info");
+        infoOpen = false;
+        document.body.style.overflow = "";
+      }
 
-      titleEl.textContent = p.title;
-      metaEl.textContent = `${p.location} · ${p.date}`;
-      settingsEl.textContent = `${p.camera} · ${p.settings}`;
+      function toggleInfo() {
+        infoOpen = !infoOpen;
+        viewer.classList.toggle("with-info", infoOpen);
+      }
 
-      viewer.classList.remove("with-info");
-      infoOpen = false;
+      function nextPhoto() {
+        openViewer((currentIndex + 1) % photoData.length);
+      }
 
-      viewer.setAttribute("aria-hidden", "false");
-      document.body.style.overflow = "hidden";
-    }
+      function prevPhoto() {
+        openViewer((currentIndex - 1 + photoData.length) % photoData.length);
+      }
 
-    function closeViewer() {
-      viewer.setAttribute("aria-hidden", "true");
-      viewer.classList.remove("with-info");
-      document.body.style.overflow = "";
-    }
+      /* ── Grid clicks ─────────────────────────────── */
 
-    function toggleInfo() {
-      infoOpen = !infoOpen;
-      viewer.classList.toggle("with-info", infoOpen);
-    }
-
-    document.querySelectorAll(".photo-grid button").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        openViewer(Number(btn.dataset.index));
+      document.querySelectorAll(".photo-grid button").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          openViewer(Number(btn.dataset.index));
+        });
       });
-    });
 
-    infoToggle.addEventListener("click", toggleInfo);
+      /* ── Viewer buttons ──────────────────────────── */
 
-    document.addEventListener("keydown", (e) => {
-      if (viewer.getAttribute("aria-hidden") === "true") return;
+      infoToggle.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleInfo();
+      });
 
-      if (e.key === "Escape") closeViewer();
-      if (e.key === "i") toggleInfo();
-      if (e.key === "ArrowRight")
-        openViewer((currentIndex + 1) % photos.length);
-      if (e.key === "ArrowLeft")
-        openViewer(
-          (currentIndex - 1 + photos.length) % photos.length
-        );
-    });
+      closeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        closeViewer();
+      });
 
-    infoToggle.addEventListener("click", (e) => {
-  e.stopPropagation();
-  toggleInfo();
-});
+      /* ── Click backdrop to close ─────────────────── */
 
+      viewer.addEventListener("click", (e) => {
+        if (e.target === viewer || e.target.classList.contains("viewer-stage")) {
+          closeViewer();
+        }
+      });
+
+      /* ── Keyboard ────────────────────────────────── */
+
+      document.addEventListener("keydown", (e) => {
+        if (viewer.getAttribute("aria-hidden") === "true") return;
+
+        if (e.key === "Escape") closeViewer();
+        if (e.key === "i" || e.key === "I") toggleInfo();
+        if (e.key === "ArrowRight") nextPhoto();
+        if (e.key === "ArrowLeft") prevPhoto();
+      });
+
+      /* ── Touch support ───────────────────────────── */
+
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let touchStartTime = 0;
+
+      viewer.addEventListener(
+        "touchstart",
+        (e) => {
+          if (e.touches.length !== 1) return;
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+          touchStartTime = Date.now();
+        },
+        { passive: true }
+      );
+
+      viewer.addEventListener(
+        "touchend",
+        (e) => {
+          if (e.changedTouches.length !== 1) return;
+
+          const dx = e.changedTouches[0].clientX - touchStartX;
+          const dy = e.changedTouches[0].clientY - touchStartY;
+          const dt = Date.now() - touchStartTime;
+
+          const absDx = Math.abs(dx);
+          const absDy = Math.abs(dy);
+
+          // Horizontal swipe (min 50px, faster than 500ms, more horizontal than vertical)
+          if (absDx > 50 && absDx > absDy && dt < 500) {
+            if (dx > 0) {
+              prevPhoto();
+            } else {
+              nextPhoto();
+            }
+            return;
+          }
+
+          // Tap to close (short touch, minimal movement)
+          if (absDx < 10 && absDy < 10 && dt < 300) {
+            // Don't close if tapping on buttons
+            const tag = e.target.tagName.toLowerCase();
+            if (tag !== "button") {
+              closeViewer();
+            }
+          }
+        },
+        { passive: true }
+      );
+
+      /* ── Disable right-click on viewer image ─────── */
+      viewerImage.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+      });
+    })();
   </script>
 </BaseLayout>

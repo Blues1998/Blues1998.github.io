@@ -13,11 +13,11 @@ I recently decided to try reading books more consistently and started with *Yaya
 
 That experiment failed quickly.
 
-The road I walk on doesn’t have a proper footpath, and dividing attention between navigating traffic and reading dense text on a phone screen turned out to be impractical. I realised that, for me at least, traditional page-based reading assumes a level of stillness and focus that isn’t always available.
+The road I walk on doesn't have a proper footpath, and dividing attention between navigating traffic and reading dense text on a phone screen turned out to be impractical. I realised that, for me at least, traditional page-based reading assumes a level of stillness and focus that isn't always available.
 
-That’s when the idea clicked.
+That's when the idea clicked.
 
-What if reading didn’t require scanning lines of text at all?  
+What if reading didn't require scanning lines of text at all?  
 What if the content could come to you, one word at a time, at a controlled pace?
 
 That evening, I opened my MacBook and started building Focus Reader.
@@ -45,7 +45,7 @@ This dual-mode approach turned out to be essential. Stream view is great for flo
 
 ## Making reading rewarding
 
-I don’t particularly enjoy reading long books. It feels effortful, and I’m easily distracted. Accepting that, rather than fighting it, shaped the next set of decisions.
+I don't particularly enjoy reading long books. It feels effortful, and I'm easily distracted. Accepting that, rather than fighting it, shaped the next set of decisions.
 
 If the app was going to work for someone like me, it had to be:
 - intuitive
@@ -54,10 +54,10 @@ If the app was going to work for someone like me, it had to be:
 
 To that end, I added:
 - **Optimal Recognition Point (ORP)** highlighting to anchor attention
-- A **reading progress sidebar** with cues like “~2 minutes to next chapter”
-- Clear, minimal controls that don’t interrupt flow
+- A **reading progress sidebar** with cues like "~2 minutes to next chapter"
+- Clear, minimal controls that don't interrupt flow
 
-The intent isn’t gamification, but reassurance — small signals that make continuing feel manageable.
+The intent isn't gamification, but reassurance — small signals that make continuing feel manageable.
 
 ---
 
@@ -65,7 +65,7 @@ The intent isn’t gamification, but reassurance — small signals that make con
 
 Focus Reader is currently a web app built with React and deployed as a static application under this site.
 
-Next steps I’m considering:
+Next steps I'm considering:
 - Porting the app to **Android**
 - Exploring offline reading
 - Potentially publishing it on the **Play Store**

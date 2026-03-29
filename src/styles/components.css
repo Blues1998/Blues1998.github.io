@@ -193,6 +193,7 @@ footer {
   background: rgba(28, 30, 33, 0.04);
   font-size: var(--font-size-sm);
 }
+
 /* ---------- Photography grid ---------- */
 .photo-grid {
   display: grid;
@@ -217,6 +218,8 @@ footer {
   border: none;
   background: none;
   cursor: pointer;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
 }
 
 .photo-grid img {
@@ -224,6 +227,13 @@ footer {
   height: 100%;
   object-fit: cover;
   border-radius: var(--radius-sm);
+  aspect-ratio: 3 / 2;
+  transition: transform var(--transition-base), opacity var(--transition-base);
+}
+
+.photo-grid button:hover img {
+  transform: scale(1.03);
+  opacity: 0.9;
 }
 
 /* ---------- Immersive viewer ---------- */
@@ -248,30 +258,7 @@ footer {
   pointer-events: auto;
 }
 
-/* ---------- Viewer layout ---------- */
-/* ---------- Immersive viewer ---------- */
-.viewer {
-  position: fixed;
-  inset: 0;
-  background: rgba(20, 22, 25, 0.94);
-  backdrop-filter: blur(6px);
-  z-index: 1000;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--transition-base);
-}
-
-.viewer[aria-hidden="false"] {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* ---------- Image container ---------- */
+/* ---------- Viewer image container ---------- */
 .viewer-stage {
   position: relative;
   max-width: 90vw;
@@ -279,13 +266,16 @@ footer {
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: auto;
 }
 
 .viewer-image {
   max-width: 100%;
-  max-height: 100%;
+  max-height: 85vh;
   object-fit: contain;
   border-radius: var(--radius-sm);
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 /* ---------- Caption ---------- */
@@ -300,22 +290,55 @@ footer {
   max-width: 60ch;
 }
 
-/* ---------- Info toggle ---------- */
+/* ---------- Info toggle (fixed to viewport) ---------- */
 .info-toggle {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  width: 32px;
-  height: 32px;
+  position: fixed;
+  top: 1rem;
+  right: 3.5rem;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.35);
   background: rgba(0, 0, 0, 0.35);
   color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
+  z-index: 1002;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast);
 }
 
-.info-toggle:hover {
-  background: rgba(0, 0, 0, 0.55);
+.info-toggle:hover,
+.info-toggle:focus-visible {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+/* ---------- Close button (fixed to viewport) ---------- */
+.viewer-close {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  z-index: 1002;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast);
+}
+
+.viewer-close:hover,
+.viewer-close:focus-visible {
+  background: rgba(0, 0, 0, 0.6);
 }
 
 /* ---------- Info panel ---------- */
@@ -328,8 +351,10 @@ footer {
   background: rgba(28, 30, 33, 0.96);
   color: #eaeaea;
   padding: var(--space-4);
+  padding-top: 4rem;
   transform: translateX(100%);
   transition: transform var(--transition-base);
+  z-index: 1001;
 }
 
 .viewer.with-info .info-panel {
@@ -353,7 +378,7 @@ footer {
   line-height: 1.6;
 }
 
-/* ---------- Mobile ---------- */
+/* ---------- Mobile viewer ---------- */
 @media (max-width: 768px) {
   .info-panel {
     width: 100%;
@@ -362,23 +387,18 @@ footer {
   .viewer-caption {
     bottom: -2.8rem;
   }
+
+  .info-toggle {
+    top: auto;
+    bottom: 1rem;
+    right: 1rem;
+  }
+
+  .viewer-close {
+    top: 0.75rem;
+    right: 0.75rem;
+  }
 }
-
-
-/* ---------- Mobile adjustments ---------- */
-/* @media (max-width: 768px) {
-  .viewer-inner {
-    flex-direction: column;
-    transform: none !important;
-  }
-
-  .info-panel {
-    width: 100%;
-    margin-left: 0;
-    margin-top: var(--space-3);
-  }
-} */
-
 
 /* ---------- Music list ---------- */
 .music-list {
