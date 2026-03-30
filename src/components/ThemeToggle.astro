@@ -40,11 +40,51 @@
 </style>
 
 <script is:inline>
-  document.querySelector('.theme-toggle')?.addEventListener('click', () => {
-    const html = document.documentElement;
-    const current = html.getAttribute('data-theme');
-    const next = current === 'dark' ? 'light' : 'dark';
-    html.setAttribute('data-theme', next);
-    try { localStorage.setItem('theme', next); } catch(e) {}
-  });
+  (function() {
+    var LOG = "[ThemeToggle]";
+    var btn = document.querySelector(".theme-toggle");
+    if (!btn) {
+      console.error(LOG, "Toggle button not found.");
+      return;
+    }
+
+    if (btn.getAttribute("data-theme-bound") === "true") {
+      console.debug(LOG, "Toggle handler already attached.");
+      return;
+    }
+
+    btn.setAttribute("data-theme-bound", "true");
+    console.debug(LOG, "Binding click handler.", {
+      initialThemeAttr: document.documentElement.getAttribute("data-theme"),
+    });
+
+    btn.addEventListener("click", function() {
+      var html = document.documentElement;
+      var current = html.getAttribute("data-theme");
+      var next = current === "dark" ? "light" : "dark";
+
+      console.debug(LOG, "Click detected.", {
+        currentTheme: current,
+        nextTheme: next,
+      });
+
+      try {
+        html.setAttribute("data-theme", next);
+        console.debug(LOG, "Applied data-theme on <html>.", {
+          dataTheme: html.getAttribute("data-theme"),
+        });
+      } catch (err) {
+        console.error(LOG, "Failed to set data-theme attribute.", err);
+      }
+
+      try {
+        localStorage.setItem("theme", next);
+        console.debug(LOG, "Persisted theme in localStorage.", {
+          storedTheme: localStorage.getItem("theme"),
+        });
+      } catch (err) {
+        console.error(LOG, "Failed to persist theme in localStorage.", err);
+      }
+    });
+  })();
 </script>

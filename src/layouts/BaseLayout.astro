@@ -26,22 +26,40 @@ const socialImage = new URL("/images/og-default.png", Astro.site);
     <!-- Theme init (must be first in head to prevent FOUC) -->
     <script is:inline>
       (function() {
+        var LOG = "[ThemeInit]";
         try {
           var t = localStorage.getItem("theme");
+          console.debug(LOG, "Init start.", { storedTheme: t });
+
           if (t === "dark" || t === "light") {
             document.documentElement.setAttribute("data-theme", t);
+            console.debug(LOG, "Applied stored theme.", { theme: t });
           } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
             document.documentElement.setAttribute("data-theme", "dark");
+            console.debug(LOG, "Applied system dark theme.");
+          } else {
+            console.debug(LOG, "No stored or dark system theme, using light defaults.");
           }
+
           // Keep in sync if system theme changes while page is open (only when no manual override)
           window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function(e) {
             try {
+              console.debug(LOG, "System theme changed.", { matchesDark: e.matches });
               if (!localStorage.getItem("theme")) {
                 document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
+                console.debug(LOG, "Applied system-driven theme change.", {
+                  theme: e.matches ? "dark" : "light",
+                });
+              } else {
+                console.debug(LOG, "Ignoring system change due to stored manual theme.");
               }
-            } catch(err) {}
+            } catch(err) {
+              console.error(LOG, "Failed handling system theme change.", err);
+            }
           });
-        } catch(e) {}
+        } catch(e) {
+          console.error(LOG, "Theme initialization failed.", e);
+        }
       })();
     </script>
 

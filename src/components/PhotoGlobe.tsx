@@ -20,8 +20,11 @@ type GlobePoint = {
   lng: number;
   location: string;
   count: number;
-  firstIndex: number;
-  thumb: string;
+  items: Array<{
+    index: number;
+    thumb: string;
+    title: string;
+  }>;
 };
 
 export default function PhotoGlobe({ photos }: { photos: PhotoMeta[] }) {
@@ -46,11 +49,15 @@ export default function PhotoGlobe({ photos }: { photos: PhotoMeta[] }) {
           lng: photo.lng,
           location: photo.location,
           count: 0,
-          firstIndex: photo.index,
-          thumb: photo.thumbSrc,
+          items: [],
         };
       }
       acc[key].count++;
+      acc[key].items.push({
+        index: photo.index,
+        thumb: photo.thumbSrc,
+        title: photo.title,
+      });
       return acc;
     }, {})
   );
@@ -115,17 +122,28 @@ export default function PhotoGlobe({ photos }: { photos: PhotoMeta[] }) {
           wrapper.className = "globe-pin";
           wrapper.style.cssText =
             "position:relative;cursor:pointer;pointer-events:auto;" +
-            "transition:transform 0.15s ease,opacity 0.1s ease;";
+            "transition:transform 0.16s ease,opacity 0.12s ease;" +
+            "transform-origin:center bottom;z-index:1;";
+
+          const first = d.items[0];
+
+          const card = document.createElement("button");
+          card.type = "button";
+          card.style.cssText =
+            "display:block;padding:0;border:none;background:none;cursor:pointer;" +
+            "border-radius:6px;";
 
           const img = document.createElement("img");
-          img.src = d.thumb;
+          img.src = first.thumb;
+          img.alt = first.title;
           img.width = 80;
           img.height = 54;
           img.draggable = false;
           img.style.cssText =
-            "display:block;border-radius:4px;border:2px solid rgba(124,138,255,0.75);" +
-            "box-shadow:0 2px 16px rgba(0,0,0,0.7);object-fit:cover;";
-          wrapper.appendChild(img);
+            "display:block;border-radius:4px;border:2px solid rgba(124,138,255,0.78);" +
+            "box-shadow:0 2px 16px rgba(0,0,0,0.7);object-fit:cover;pointer-events:none;";
+          card.appendChild(img);
+          wrapper.appendChild(card);
 
           if (d.count > 1) {
             const badge = document.createElement("span");
@@ -134,7 +152,7 @@ export default function PhotoGlobe({ photos }: { photos: PhotoMeta[] }) {
               "position:absolute;top:-7px;right:-7px;background:#7c8aff;color:#fff;" +
               "font-size:10px;font-weight:600;padding:1px 5px;border-radius:10px;" +
               "font-family:Inter,sans-serif;line-height:16px;";
-            wrapper.appendChild(badge);
+            card.appendChild(badge);
           }
 
           const label = document.createElement("div");
@@ -145,17 +163,83 @@ export default function PhotoGlobe({ photos }: { photos: PhotoMeta[] }) {
             "opacity:0;transition:opacity 0.15s;";
           wrapper.appendChild(label);
 
-          wrapper.addEventListener("pointerover", () => {
+          const picker = document.createElement("div");
+          picker.style.cssText =
+            "position:absolute;left:50%;bottom:calc(100% + 10px);transform:translate(-50%, 8px) scale(0.96);" +
+            "display:flex;gap:6px;padding:6px;border-radius:9px;" +
+            "background:rgba(10,12,18,0.94);border:1px solid rgba(124,138,255,0.4);" +
+            "box-shadow:0 10px 24px rgba(0,0,0,0.42);backdrop-filter:blur(7px);" +
+            "opacity:0;pointer-events:none;transition:opacity 0.16s ease,transform 0.16s ease;";
+
+          if (d.items.length > 1) {
+            d.items.forEach((item) => {
+              const option = document.createElement("button");
+              option.type = "button";
+              option.style.cssText =
+                "padding:0;border:none;background:none;cursor:pointer;border-radius:6px;overflow:hidden;" +
+                "box-shadow:0 3px 12px rgba(0,0,0,0.35);";
+
+              const optionImg = document.createElement("img");
+              optionImg.src = item.thumb;
+              optionImg.alt = item.title;
+              optionImg.width = 76;
+              optionImg.height = 52;
+              optionImg.draggable = false;
+              optionImg.style.cssText =
+                "display:block;border:1px solid rgba(255,255,255,0.3);border-radius:6px;object-fit:cover;" +
+                "transition:transform 0.12s ease,filter 0.12s ease;";
+              option.appendChild(optionImg);
+
+              option.addEventListener("pointerenter", () => {
+                optionImg.style.transform = "scale(1.06)";
+                optionImg.style.filter = "brightness(1.08)";
+              });
+              option.addEventListener("pointerleave", () => {
+                optionImg.style.transform = "scale(1)";
+                optionImg.style.filter = "brightness(1)";
+              });
+              option.addEventListener("click", (e) => {
+                e.stopPropagation();
+                openViewerRef.current(item.index);
+              });
+
+              picker.appendChild(option);
+            });
+            wrapper.appendChild(picker);
+          }
+
+          const showExpandedState = () => {
             wrapper.style.transform = "scale(1.12)";
+            wrapper.style.zIndex = "30";
             label.style.opacity = "1";
-          });
-          wrapper.addEventListener("pointerout", () => {
+            if (d.items.length > 1) {
+              picker.style.opacity = "1";
+              picker.style.pointerEvents = "auto";
+              picker.style.transform = "translate(-50%, 0) scale(1)";
+            }
+          };
+
+          const hideExpandedState = () => {
             wrapper.style.transform = "scale(1)";
+            wrapper.style.zIndex = "1";
             label.style.opacity = "0";
+            if (d.items.length > 1) {
+              picker.style.opacity = "0";
+              picker.style.pointerEvents = "none";
+              picker.style.transform = "translate(-50%, 8px) scale(0.96)";
+            }
+          };
+
+          wrapper.addEventListener("pointerenter", showExpandedState);
+          wrapper.addEventListener("pointerleave", (event) => {
+            const toEl = event.relatedTarget as Node | null;
+            if (toEl && wrapper.contains(toEl)) return;
+            hideExpandedState();
           });
-          wrapper.addEventListener("click", (e) => {
+
+          card.addEventListener("click", (e) => {
             e.stopPropagation();
-            openViewerRef.current(d.firstIndex);
+            openViewerRef.current(first.index);
           });
 
           return wrapper;
