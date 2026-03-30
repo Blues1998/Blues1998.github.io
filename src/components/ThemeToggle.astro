@@ -42,6 +42,7 @@
 <script is:inline>
   (function() {
     var LOG = "[ThemeToggle]";
+    var TRANSITION_MS = 550;
     var btn = document.querySelector(".theme-toggle");
     if (!btn) {
       console.error(LOG, "Toggle button not found.");
@@ -67,6 +68,15 @@
         currentTheme: current,
         nextTheme: next,
       });
+
+      try {
+        html.classList.add("theme-transitioning");
+        window.setTimeout(function() {
+          html.classList.remove("theme-transitioning");
+        }, TRANSITION_MS);
+      } catch (err) {
+        console.error(LOG, "Failed to apply transition class.", err);
+      }
 
       try {
         html.setAttribute("data-theme", next);

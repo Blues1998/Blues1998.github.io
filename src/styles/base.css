@@ -19,6 +19,27 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Smooth theme transition (applies only while toggle is switching) */
+:root.theme-transitioning,
+:root.theme-transitioning *,
+:root.theme-transitioning *::before,
+:root.theme-transitioning *::after {
+  transition:
+    background-color 0.55s ease,
+    color 0.55s ease,
+    border-color 0.55s ease,
+    box-shadow 0.55s ease !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root.theme-transitioning,
+  :root.theme-transitioning *,
+  :root.theme-transitioning *::before,
+  :root.theme-transitioning *::after {
+    transition: none !important;
+  }
+}
+
 /* ---------- Typography ---------- */
 h1,
 h2,
