@@ -1,13 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import * as THREE from "three";
 
-type PlaygroundHeroProps = { featuredHref: string; heading: string; copy: string };
-
-function resolveHref(href: string) {
-  const base = import.meta.env.BASE_URL || "/";
-  return /^(?:[a-z]+:)?\/\//i.test(href) ? href : `${base}${href.replace(/^\//, "")}`;
-}
+type PlaygroundHeroProps = { heading: string; copy: string };
 
 function seededRng(seed: number) {
   let s = seed >>> 0;
@@ -114,17 +109,13 @@ function smoothstep(a: number, b: number, x: number) {
   return t * t * (3 - 2 * t);
 }
 
-export default function PlaygroundHero({ featuredHref, heading, copy }: PlaygroundHeroProps) {
+export default function PlaygroundHero({ heading, copy }: PlaygroundHeroProps) {
   const shellRef = useRef<HTMLElement | null>(null);
   const frameRef = useRef<number | null>(null);
   const scrollRef = useRef(0);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [fallbackMode, setFallbackMode] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
-
-  const featuredUrl = useMemo(() => resolveHref(featuredHref), [featuredHref]);
-  const handleGallery = () => document.getElementById("playground-gallery")?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
-  void featuredUrl; void handleGallery;
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -418,19 +409,12 @@ export default function PlaygroundHero({ featuredHref, heading, copy }: Playgrou
         <div className="playground-hero-grid" />
       </div>
 
-      {/*
       <div className="playground-hero-content">
         <div className="playground-hero-copyblock">
-          <p className="playground-hero-kicker">Interactive Lab</p>
           <h1>{heading}</h1>
           <p className="playground-hero-copy">{copy}</p>
-          <div className="playground-hero-actions">
-            <button className="playground-hero-button playground-hero-button-primary" type="button" onClick={handleGallery}>Enter the gallery</button>
-            <a className="playground-hero-button playground-hero-button-secondary" href={featuredUrl}>Launch featured build</a>
-          </div>
         </div>
       </div>
-      */}
 
       <div className="playground-hero-scrollcue" aria-hidden="true">
         <span className="playground-hero-scrollcue-line" />

@@ -4,7 +4,6 @@ import PlaygroundHero from "../../components/PlaygroundHero";
 import PlaygroundGallery from "../../components/PlaygroundGallery";
 import { groupPlaygroundRows, playgroundItems } from "../../data/playground";
 
-const featuredItem = playgroundItems.find((item) => item.featured) ?? playgroundItems[0];
 const playgroundRows = groupPlaygroundRows(playgroundItems, 3);
 ---
 
@@ -14,11 +13,11 @@ const playgroundRows = groupPlaygroundRows(playgroundItems, 3);
 >
   <PlaygroundHero
     client:load
-    featuredHref={featuredItem.primaryHref}
-    heading="Playground"
-    copy="A fullscreen 3D lab for experiments, prototypes, and browser ideas. Move through the scene first, then drop into the gallery below."
+    heading="welcome to the playground"
+    copy="Let's break some eggs"
   />
 
+  <!--
   <section class="playground-intro-section">
     <div class="playground-intro">
       <p class="playground-intro-label">Field notes</p>
@@ -35,12 +34,15 @@ const playgroundRows = groupPlaygroundRows(playgroundItems, 3);
       </div>
     </div>
   </section>
+  -->
 
   <section class="playground-gallery-section">
+    <!--
     <div class="playground-grid-header">
       <p class="playground-grid-kicker">Current experiments</p>
       <h2>Live builds, active prototypes, and browser ideas that are still mutating.</h2>
     </div>
+    -->
 
     <PlaygroundGallery client:load rows={playgroundRows} />
   </section>

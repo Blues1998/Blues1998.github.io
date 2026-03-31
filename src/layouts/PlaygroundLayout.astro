@@ -10,7 +10,6 @@ const {
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const socialImage = new URL("/images/og-default.png", Astro.site);
-const base = import.meta.env.BASE_URL;
 ---
 
 <!DOCTYPE html>
@@ -44,11 +43,6 @@ const base = import.meta.env.BASE_URL;
   </head>
 
   <body class="playground-page">
-    <a class="playground-back-link" href={`${base}`} aria-label="Back to main site">
-      <span class="playground-back-link-mark" aria-hidden="true">↩</span>
-      Back to site
-    </a>
-
     <main class="playground-main">
       <slot />
     </main>

@@ -29,6 +29,18 @@ body.playground-page {
   overflow-x: hidden;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  body.playground-page {
+    cursor: url("/cursors/playground-fork.svg") 12 8, default;
+  }
+
+  body.playground-page a,
+  body.playground-page button,
+  body.playground-page [role="button"] {
+    cursor: url("/cursors/playground-fork.svg") 12 8, pointer;
+  }
+}
+
 body.playground-page::before {
   content: "";
   position: fixed;
@@ -46,34 +58,6 @@ body.playground-page::before {
   position: relative;
   z-index: 1;
   padding: 0;
-}
-
-.playground-back-link {
-  position: fixed;
-  top: 1.2rem;
-  left: 1.2rem;
-  z-index: 20;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  min-height: 2.75rem;
-  padding: 0.75rem 1rem;
-  border: 1px solid rgba(131, 176, 255, 0.18);
-  border-radius: 999px;
-  background: rgba(4, 10, 20, 0.52);
-  backdrop-filter: blur(18px);
-  color: var(--playground-text);
-  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.18);
-}
-
-.playground-back-link:hover {
-  text-decoration: none;
-  border-color: rgba(131, 176, 255, 0.3);
-}
-
-.playground-back-link-mark {
-  color: var(--playground-accent);
-  font-size: 1rem;
 }
 
 .playground-hero-shell {
@@ -148,24 +132,33 @@ body.playground-page::before {
 }
 
 .playground-hero-content {
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 1;
-  width: 100%;
-  display: flex;
-  align-items: flex-end;
-  height: 100vh;
-  padding: 0 0 8vh;
+  left: 0;
+  z-index: 12;
+  width: min(24rem, calc(100vw - 2.4rem));
+  padding: 5.6rem 0 0 1.2rem;
+  pointer-events: none;
+  opacity: calc(1 - min(var(--hero-progress) * 2.4, 1));
+  transform: translate3d(0, calc(var(--hero-progress) * -1.1rem), 0);
+  transition:
+    opacity 120ms linear,
+    transform 120ms linear;
 }
 
 .playground-hero-copyblock {
-  width: min(100%, 34rem);
-  max-width: 34rem;
-  margin-left: clamp(2rem, 7vw, 7rem);
-  padding-right: 1.5rem;
+  width: 100%;
+  max-width: 22rem;
+  padding: 0.95rem 1rem 1rem;
+  border: 1px solid rgba(133, 182, 255, 0.14);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(8, 16, 30, 0.7), rgba(6, 11, 21, 0.46));
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(14px);
 }
 
-.playground-hero-kicker,
 .playground-intro-label,
 .playground-grid-kicker {
   margin: 0 0 1rem;
@@ -185,20 +178,22 @@ body.playground-page::before {
 }
 
 .playground-hero-content h1 {
-  max-width: 7ch;
-  font-size: clamp(3.6rem, 7vw, 6.6rem);
-  line-height: 0.92;
+  max-width: 12ch;
+  font-size: clamp(1.85rem, 3vw, 2.8rem);
+  line-height: 0.98;
+  text-transform: lowercase;
   text-shadow:
     0 2px 32px rgba(0, 0, 0, 0.6),
     0 1px 8px rgba(0, 0, 0, 0.5);
 }
 
 .playground-hero-copy {
-  max-width: 30rem;
-  margin: 1.35rem 0 0;
-  color: var(--playground-muted);
-  font-size: clamp(1rem, 1.4vw, 1.15rem);
-  line-height: 1.65;
+  max-width: 16rem;
+  margin: 0.6rem 0 0;
+  color: rgba(238, 244, 255, 0.82);
+  font-size: clamp(0.92rem, 1.2vw, 1rem);
+  font-style: italic;
+  line-height: 1.4;
   text-shadow: 0 1px 16px rgba(0, 0, 0, 0.55);
 }
 
@@ -601,48 +596,37 @@ body.playground-page::before {
 
 @media (max-aspect-ratio: 4/3) and (min-width: 761px) {
   .playground-hero-content {
-    align-items: end;
-    padding-bottom: 7vh;
+    width: min(22rem, calc(100vw - 2.2rem));
+    padding-top: 5.2rem;
   }
 
   .playground-hero-copyblock {
-    width: min(100%, 32rem);
-    max-width: 32rem;
+    max-width: 20rem;
   }
 
   .playground-hero-content h1 {
-    max-width: 7ch;
-    font-size: clamp(3.2rem, 6vw, 5rem);
+    font-size: clamp(1.8rem, 3.8vw, 2.4rem);
   }
 }
 
 @media (max-width: 760px) {
-  .playground-back-link {
-    top: 0.9rem;
-    left: 0.9rem;
-  }
-
   .playground-hero-content {
-    min-height: 100vh;
-    padding: 0 0 5rem;
-    align-items: flex-end;
+    width: min(18rem, calc(100vw - 1.8rem));
+    padding: 4.4rem 0 0 0.9rem;
   }
 
   .playground-hero-copyblock {
-    width: auto;
-    max-width: none;
-    margin-left: 1.15rem;
-    margin-right: 1.15rem;
-    padding-right: 0;
+    max-width: 16.5rem;
+    padding: 0.8rem 0.85rem 0.85rem;
   }
 
   .playground-hero-content h1 {
-    max-width: 7ch;
-    font-size: clamp(3rem, 13vw, 4.6rem);
+    font-size: clamp(1.45rem, 7vw, 2rem);
   }
 
   .playground-hero-copy {
-    max-width: none;
+    max-width: 12rem;
+    font-size: 0.88rem;
   }
 
   .playground-intro-section,
