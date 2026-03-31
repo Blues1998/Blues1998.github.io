@@ -1,0 +1,54 @@
+---
+import PlaygroundLayout from "../../layouts/PlaygroundLayout.astro";
+import PlaygroundHero from "../../components/PlaygroundHero";
+import PlaygroundGallery from "../../components/PlaygroundGallery";
+import { groupPlaygroundRows, playgroundItems } from "../../data/playground";
+
+const featuredItem = playgroundItems.find((item) => item.featured) ?? playgroundItems[0];
+const playgroundRows = groupPlaygroundRows(playgroundItems, 3);
+---
+
+<PlaygroundLayout
+  title="Playground — Animesh Singh"
+  description="An immersive microsite for experiments, prototypes, and strange browser ideas."
+>
+  <PlaygroundHero
+    client:load
+    featuredHref={featuredItem.primaryHref}
+    heading="Playground"
+    copy="A fullscreen 3D lab for experiments, prototypes, and browser ideas. Move through the scene first, then drop into the gallery below."
+  />
+
+  <section class="playground-intro-section">
+    <div class="playground-intro">
+      <p class="playground-intro-label">Field notes</p>
+      <div class="playground-intro-body">
+        <p class="playground-intro-copy">
+          The work here is intentionally less behaved. Some pieces are live, some are unstable, and
+          some are still closer to a sketch than a product. The point is to test texture, systems,
+          and feeling in the browser.
+        </p>
+        <p class="playground-intro-copy">
+          As you move downward, the gallery snakes from row to row so it feels discovered rather than
+          simply listed.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="playground-gallery-section">
+    <div class="playground-grid-header">
+      <p class="playground-grid-kicker">Current experiments</p>
+      <h2>Live builds, active prototypes, and browser ideas that are still mutating.</h2>
+    </div>
+
+    <PlaygroundGallery client:load rows={playgroundRows} />
+  </section>
+
+  <section class="playground-closing-section">
+    <p class="playground-closing">
+      This place should keep changing. New entries can appear here before they become projects, and
+      some may never leave this room at all.
+    </p>
+  </section>
+</PlaygroundLayout>

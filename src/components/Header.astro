@@ -24,6 +24,7 @@ const isActive = (path) => {
 
     <div class="nav-right">
       <ul class="nav-links">
+        <li><a href={`${base}playground/`} aria-current={isActive("/playground") ? "page" : undefined}>Playground</a></li>
         <li><a href={`${base}projects/`} aria-current={isActive("/projects") ? "page" : undefined}>Projects</a></li>
         <li><a href={`${base}photography/`} aria-current={isActive("/photography") ? "page" : undefined}>Photography</a></li>
         <li><a href={`${base}music/`} aria-current={isActive("/music") ? "page" : undefined}>Music</a></li>
