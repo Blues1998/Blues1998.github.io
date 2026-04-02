@@ -2,9 +2,9 @@
 import PlaygroundLayout from "../../layouts/PlaygroundLayout.astro";
 import PlaygroundHero from "../../components/PlaygroundHero";
 import PlaygroundGallery from "../../components/PlaygroundGallery";
-import { groupPlaygroundRows, playgroundItems } from "../../data/playground";
+import { groupPlaygroundRows, playgroundPanels } from "../../data/playground";
 
-const playgroundRows = groupPlaygroundRows(playgroundItems, 3);
+const playgroundRows = groupPlaygroundRows(playgroundPanels, 2);
 ---
 
 <PlaygroundLayout

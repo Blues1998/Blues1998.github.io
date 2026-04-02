@@ -62,9 +62,38 @@ body.playground-page::before {
 
 .playground-hero-shell {
   --hero-progress: 0;
+  --hero-pointer-x: 50%;
+  --hero-pointer-y: 34%;
   position: relative;
   /* tall scroll container — Three.js canvas is fixed so it stays on screen while user scrolls */
   min-height: 300vh;
+}
+
+.playground-hero-shell::before,
+.playground-hero-shell::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.playground-hero-shell::before {
+  z-index: 1;
+  background:
+    radial-gradient(circle at var(--hero-pointer-x) var(--hero-pointer-y), rgba(123, 176, 255, 0.22), transparent 24%),
+    radial-gradient(circle at calc(var(--hero-pointer-x) + 10%) calc(var(--hero-pointer-y) + 8%), rgba(255, 138, 90, 0.1), transparent 20%);
+  opacity: calc(0.34 + (1 - var(--hero-progress)) * 0.14);
+  mix-blend-mode: screen;
+  filter: blur(22px);
+}
+
+.playground-hero-shell::after {
+  z-index: 1;
+  background:
+    linear-gradient(110deg, transparent 18%, rgba(142, 189, 255, 0.08) 40%, rgba(255, 255, 255, 0.06) 50%, transparent 68%);
+  transform: translateX(calc((var(--hero-progress) - 0.2) * 38vw));
+  opacity: calc(0.12 + (1 - min(var(--hero-progress) * 1.5, 1)) * 0.28);
+  filter: blur(22px);
 }
 
 .playground-hero-stage {
@@ -98,6 +127,7 @@ body.playground-page::before {
     radial-gradient(circle at 70% 60%, rgba(255, 255, 255, 0.6) 0 0.7px, transparent 0.8px),
     radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.7) 0 0.6px, transparent 0.7px);
   background-size: 180px 180px, 220px 220px, 140px 140px;
+  transform: translate3d(calc((var(--hero-pointer-x) - 50%) * 0.03), calc((var(--hero-pointer-y) - 50%) * 0.03), 0);
 }
 
 .playground-hero-grid {
@@ -336,32 +366,35 @@ body.playground-page::before {
 
 .playground-gallery {
   display: grid;
-  gap: 1.25rem;
+  gap: 1.4rem;
   min-height: 18rem;
 }
 
 .playground-row {
-  --row-shift: 0px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1.25rem;
-  transform: translateX(var(--row-shift));
-  transition: transform 180ms ease-out;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.4rem;
 }
 
 .playground-gallery.is-enhanced .playground-card {
+  --card-pointer-x: 50%;
+  --card-pointer-y: 50%;
+  --card-pointer-active: 0;
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 17rem;
-  padding: 1.15rem;
+  min-height: 18.5rem;
+  padding: 1.05rem 1.05rem 1rem;
   overflow: hidden;
-  border: 1px solid rgba(119, 165, 255, 0.14);
-  border-radius: var(--playground-radius-md);
+  border: 1px solid rgba(119, 165, 255, 0.16);
+  border-radius: 24px 16px 22px 16px;
+  clip-path: polygon(0 0, calc(100% - 2rem) 0, 100% 1.95rem, 100% 100%, 0 100%, 0 0);
   background:
-    linear-gradient(180deg, rgba(10, 19, 35, 0.86), rgba(7, 13, 24, 0.8)),
-    radial-gradient(circle at top right, rgba(100, 150, 255, 0.14), transparent 38%);
-  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.2);
+    linear-gradient(180deg, rgba(11, 20, 36, 0.9), rgba(7, 13, 24, 0.82)),
+    radial-gradient(circle at top right, rgba(100, 150, 255, 0.16), transparent 42%);
+  box-shadow:
+    0 20px 46px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
   opacity: 0;
   transform: translate3d(0, 22px, 0) scale(0.98);
   transition:
@@ -372,11 +405,11 @@ body.playground-page::before {
 }
 
 .playground-gallery.is-enhanced .playground-card[data-direction="ltr"] {
-  transform: translate3d(-34px, 24px, 0) scale(0.98);
+  transform: translate3d(0, var(--card-enter-y, 18px), 0) scale(0.985);
 }
 
 .playground-gallery.is-enhanced .playground-card[data-direction="rtl"] {
-  transform: translate3d(34px, 24px, 0) scale(0.98);
+  transform: translate3d(0, var(--card-enter-y, 18px), 0) scale(0.985);
 }
 
 .playground-gallery.is-enhanced .playground-card[data-visible="true"] {
@@ -388,15 +421,18 @@ body.playground-page::before {
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 17rem;
-  padding: 1.15rem;
+  min-height: 18.5rem;
+  padding: 1.05rem 1.05rem 1rem;
   overflow: hidden;
-  border: 1px solid rgba(119, 165, 255, 0.14);
-  border-radius: var(--playground-radius-md);
+  border: 1px solid rgba(119, 165, 255, 0.16);
+  border-radius: 24px 16px 22px 16px;
+  clip-path: polygon(0 0, calc(100% - 2rem) 0, 100% 1.95rem, 100% 100%, 0 100%, 0 0);
   background:
-    linear-gradient(180deg, rgba(10, 19, 35, 0.86), rgba(7, 13, 24, 0.8)),
-    radial-gradient(circle at top right, rgba(100, 150, 255, 0.14), transparent 38%);
-  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.2);
+    linear-gradient(180deg, rgba(11, 20, 36, 0.9), rgba(7, 13, 24, 0.82)),
+    radial-gradient(circle at top right, rgba(100, 150, 255, 0.16), transparent 42%);
+  box-shadow:
+    0 20px 46px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
   opacity: 1;
   transform: none;
 }
@@ -404,7 +440,10 @@ body.playground-page::before {
 .playground-card:hover,
 .playground-card:focus-within {
   border-color: rgba(119, 165, 255, 0.28);
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.24);
+  box-shadow:
+    0 24px 54px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(148, 190, 255, 0.08),
+    0 0 28px rgba(102, 167, 255, 0.08);
 }
 
 .playground-card::before {
@@ -413,33 +452,94 @@ body.playground-page::before {
   inset: 0;
   background:
     linear-gradient(135deg, rgba(106, 166, 255, 0.08), transparent 32%),
-    radial-gradient(circle at 85% 12%, rgba(255, 124, 82, 0.18), transparent 22%);
+    linear-gradient(180deg, transparent 58%, rgba(255, 255, 255, 0.03)),
+    radial-gradient(circle at 85% 12%, rgba(255, 124, 82, 0.18), transparent 24%),
+    radial-gradient(circle at var(--card-pointer-x) var(--card-pointer-y), rgba(135, 196, 255, calc(var(--card-pointer-active) * 0.18)), transparent 30%);
   pointer-events: none;
 }
 
 .playground-card::after {
   content: "";
   position: absolute;
-  inset: auto -20% -28% auto;
-  width: 11rem;
-  height: 11rem;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.12), transparent 70%);
+  inset: auto 0.9rem 0.8rem auto;
+  width: 5.9rem;
+  height: 5.9rem;
+  border-radius: 20px 14px 22px 14px;
+  border: 1px solid rgba(124, 171, 255, 0.11);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent),
+    radial-gradient(circle at 70% 30%, rgba(255, 148, 102, 0.18), transparent 55%);
   pointer-events: none;
+  opacity: 0.9;
 }
 
-.playground-card-primary {
+.playground-card-aura,
+.playground-card-scanline {
   position: absolute;
   inset: 0;
   z-index: 1;
+  pointer-events: none;
 }
 
-.playground-card-primary:focus-visible {
-  outline: 2px solid var(--playground-accent);
-  outline-offset: -5px;
+.playground-card-aura {
+  background: radial-gradient(circle at var(--card-pointer-x) var(--card-pointer-y), rgba(118, 188, 255, calc(var(--card-pointer-active) * 0.16)), transparent 22%);
+  opacity: 0.8;
 }
 
-.playground-card > *:not(.playground-card-primary) {
+.playground-card-scanline {
+  inset: -24% 0 auto;
+  height: 34%;
+  background: linear-gradient(180deg, transparent, rgba(168, 206, 255, 0.12), transparent);
+  opacity: 0;
+  transform: translateY(-140%);
+  transition: opacity 180ms ease;
+}
+
+.playground-card:hover .playground-card-scanline,
+.playground-card:focus-within .playground-card-scanline {
+  opacity: 1;
+  animation: playground-card-scanline 1.6s ease;
+}
+
+.playground-card-frame,
+.playground-card-frame-cut,
+.playground-card-window {
+  position: absolute;
+  pointer-events: none;
+}
+
+.playground-card-frame {
+  inset: 0.6rem;
+  border: 1px solid rgba(133, 182, 255, 0.08);
+  border-radius: 20px 12px 18px 12px;
+  opacity: 0.82;
+}
+
+.playground-card-frame-cut {
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 2rem;
+  height: 2rem;
+  border-top: 1px solid rgba(133, 182, 255, 0.16);
+  border-right: 1px solid rgba(133, 182, 255, 0.16);
+  border-radius: 0 10px 0 0;
+  opacity: 0.8;
+}
+
+.playground-card-window {
+  top: 3.2rem;
+  right: 0.95rem;
+  width: 4.5rem;
+  height: 5.9rem;
+  border-radius: 18px 12px 18px 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent),
+    radial-gradient(circle at 40% 20%, rgba(127, 179, 255, 0.2), transparent 55%);
+  border: 1px solid rgba(131, 178, 255, 0.1);
+  opacity: 0.9;
+}
+
+.playground-card > * {
   position: relative;
   z-index: 2;
 }
@@ -447,8 +547,8 @@ body.playground-page::before {
 .playground-card-topline {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-bottom: 1.1rem;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
 }
 
 .playground-pill,
@@ -474,47 +574,40 @@ body.playground-page::before {
   color: #ffb298;
 }
 
-.playground-pill-status.status-live {
-  background: rgba(67, 197, 134, 0.16);
-  color: #9ff0c8;
+.playground-pill-status.status-warming {
+  background: rgba(255, 149, 104, 0.14);
+  color: #ffc2a7;
+  animation: playground-status-pulse 3.2s ease-in-out infinite;
 }
 
-.playground-pill-status.status-in-progress {
-  background: rgba(255, 188, 74, 0.14);
-  color: #ffd485;
+.playground-pill-status.status-incubating {
+  background: rgba(118, 184, 255, 0.14);
+  color: #b9d9ff;
+  animation: playground-status-pulse 4s ease-in-out infinite;
 }
 
-.playground-pill-status.status-concept {
-  background: rgba(255, 124, 82, 0.12);
-  color: #ffb197;
-}
-
-.playground-pill-status.status-archived {
-  background: rgba(158, 171, 194, 0.14);
-  color: #c7d3e8;
+.playground-pill-status.status-under-observation {
+  background: rgba(186, 161, 255, 0.14);
+  color: #d8ccff;
+  animation: playground-status-pulse 4.6s ease-in-out infinite;
 }
 
 .playground-card-title {
-  max-width: 12ch;
-  margin-bottom: 0.75rem;
+  max-width: 9ch;
+  margin-bottom: 0.65rem;
   font-family: "Manrope", var(--font-body);
-  font-size: clamp(1.28rem, 2vw, 1.75rem);
-  font-weight: 700;
-  line-height: 1.05;
-}
-
-.playground-card-summary,
-.playground-card-note {
-  color: var(--playground-muted);
+  font-size: clamp(1.45rem, 2.3vw, 2rem);
+  font-weight: 800;
+  line-height: 0.96;
+  letter-spacing: -0.06em;
 }
 
 .playground-card-summary {
-  margin-bottom: 0.8rem;
-}
-
-.playground-card-note {
-  margin-bottom: 1rem;
-  font-size: 0.92rem;
+  max-width: 20rem;
+  margin-bottom: 0.85rem;
+  color: var(--playground-muted);
+  font-size: 0.94rem;
+  line-height: 1.55;
 }
 
 .playground-card-tech {
@@ -522,15 +615,18 @@ body.playground-page::before {
   flex-wrap: wrap;
   gap: 0.45rem;
   margin-top: auto;
+  max-width: 80%;
 }
 
 .playground-card-tag {
-  min-height: 1.8rem;
-  padding: 0.24rem 0.68rem;
-  border: 1px solid rgba(113, 164, 255, 0.16);
-  background: rgba(102, 167, 255, 0.09);
-  color: #b9d5ff;
-  font-size: 0.78rem;
+  min-height: 1.9rem;
+  padding: 0.24rem 0.72rem;
+  border: 1px solid rgba(113, 164, 255, 0.14);
+  background: rgba(102, 167, 255, 0.07);
+  color: rgba(201, 221, 255, 0.84);
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
 }
 
 .playground-card-footer {
@@ -538,10 +634,10 @@ body.playground-page::before {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.8rem;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(113, 164, 255, 0.12);
+  gap: 0.6rem;
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(113, 164, 255, 0.1);
 }
 
 .playground-card-cta,
@@ -551,19 +647,41 @@ body.playground-page::before {
 }
 
 .playground-card-cta {
-  color: #cfe0ff;
+  color: rgba(223, 233, 255, 0.84);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .playground-card-secondary {
-  z-index: 3;
-  padding: 0.35rem 0.72rem;
-  border: 1px solid rgba(113, 164, 255, 0.18);
+  padding: 0.38rem 0.78rem;
+  border: 1px solid rgba(113, 164, 255, 0.14);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(201, 221, 255, 0.76);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .playground-card-secondary:hover {
   text-decoration: none;
+}
+
+.playground-card.panel-tone-ember {
+  background:
+    linear-gradient(180deg, rgba(24, 15, 16, 0.92), rgba(11, 14, 23, 0.84)),
+    radial-gradient(circle at top right, rgba(255, 133, 87, 0.16), transparent 42%);
+}
+
+.playground-card.panel-tone-frost {
+  background:
+    linear-gradient(180deg, rgba(9, 18, 37, 0.92), rgba(7, 13, 24, 0.84)),
+    radial-gradient(circle at top right, rgba(109, 171, 255, 0.18), transparent 42%);
+}
+
+.playground-card.panel-tone-signal {
+  background:
+    linear-gradient(180deg, rgba(16, 14, 35, 0.92), rgba(9, 12, 24, 0.84)),
+    radial-gradient(circle at top right, rgba(161, 129, 255, 0.18), transparent 42%);
 }
 
 .playground-closing-section {
@@ -582,15 +700,32 @@ body.playground-page::before {
   backdrop-filter: none;
 }
 
+@keyframes playground-card-scanline {
+  0% {
+    transform: translateY(-140%);
+  }
+
+  100% {
+    transform: translateY(320%);
+  }
+}
+
+@keyframes playground-status-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  }
+
+  50% {
+    box-shadow: 0 0 0.8rem rgba(143, 193, 255, 0.12);
+  }
+}
+
 @media (max-width: 1100px) {
   .playground-intro-section,
   .playground-gallery-section,
   .playground-closing-section {
     width: min(100%, 92rem);
-  }
-
-  .playground-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -658,21 +793,45 @@ body.playground-page::before {
   .playground-card,
   .playground-gallery.is-enhanced .playground-card[data-direction="ltr"],
   .playground-gallery.is-enhanced .playground-card[data-direction="rtl"] {
-    min-height: auto;
+    min-height: 16.5rem;
     transform: translate3d(0, 24px, 0);
   }
 
   .playground-gallery.is-enhanced .playground-card[data-visible="true"] {
     transform: translate3d(0, 0, 0);
   }
+
+  .playground-card-window {
+    top: 3rem;
+    right: 0.8rem;
+    width: 3.7rem;
+    height: 4.8rem;
+  }
+
+  .playground-card-title {
+    max-width: 8ch;
+    font-size: clamp(1.35rem, 6vw, 1.8rem);
+  }
+
+  .playground-card-summary {
+    max-width: 14rem;
+    font-size: 0.9rem;
+  }
+
+  .playground-card-tech {
+    max-width: 100%;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .playground-hero-shell::before,
+  .playground-hero-shell::after,
   .playground-hero-stage,
+  .playground-hero-content,
   .playground-hero-scrollcue,
   .playground-row,
   .playground-card,
-  .playground-hero-button {
+  .playground-card-scanline {
     transition: none;
   }
 
@@ -686,5 +845,12 @@ body.playground-page::before {
   .playground-hero-stage {
     transform: none;
     opacity: 1;
+  }
+
+  .playground-pill-status.status-live,
+  .playground-pill-status.status-in-progress,
+  .playground-pill-status.status-concept,
+  .playground-card-scanline {
+    animation: none;
   }
 }

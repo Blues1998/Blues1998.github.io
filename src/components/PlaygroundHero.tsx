@@ -254,13 +254,91 @@ export default function PlaygroundHero({ heading, copy }: PlaygroundHeroProps) {
     const pMat = new THREE.PointsMaterial({ color: 0xffe8b0, size: 0.038, transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, depthWrite: false });
     root.add(new THREE.Points(pGeo, pMat));
 
+    // ── Ambient dust ──────────────────────────────────────────────────────────
+    const DC = 180;
+    const dPos = new Float32Array(DC * 3);
+    const dVel = new Float32Array(DC * 3);
+    const dSeed = seededRng(0xabcd1234);
+    for (let i = 0; i < DC; i++) {
+      const base = i * 3;
+      dPos[base] = (dSeed() - 0.5) * 12;
+      dPos[base + 1] = (dSeed() - 0.5) * 8;
+      dPos[base + 2] = (dSeed() - 0.5) * 7;
+      dVel[base] = (dSeed() - 0.5) * 0.0035;
+      dVel[base + 1] = 0.001 + dSeed() * 0.0025;
+      dVel[base + 2] = (dSeed() - 0.5) * 0.0025;
+    }
+    const dGeo = new THREE.BufferGeometry();
+    dGeo.setAttribute("position", new THREE.BufferAttribute(dPos, 3));
+    const dMat = new THREE.PointsMaterial({
+      color: 0xbfd9ff,
+      size: 0.028,
+      transparent: true,
+      opacity: 0.0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const dust = new THREE.Points(dGeo, dMat);
+    root.add(dust);
+
+    // ── Micro fragments ──────────────────────────────────────────────────────
+    const MC = 120;
+    const mPos = new Float32Array(MC * 3);
+    const mBase = new Float32Array(MC * 3);
+    const mDir = new Float32Array(MC * 3);
+    const mf = seededRng(0x51ced);
+    for (let i = 0; i < MC; i++) {
+      const base = i * 3;
+      const phi = mf() * Math.PI;
+      const theta = mf() * Math.PI * 2;
+      const radius = eggR(phi) * (0.94 + mf() * 0.22);
+      mBase[base] = radius * Math.cos(theta);
+      mBase[base + 1] = eggY(phi) * (0.9 + mf() * 0.16);
+      mBase[base + 2] = radius * Math.sin(theta);
+      mPos[base] = mBase[base];
+      mPos[base + 1] = mBase[base + 1];
+      mPos[base + 2] = mBase[base + 2];
+      const drift = new THREE.Vector3(
+        Math.cos(theta) + (mf() - 0.5) * 0.4,
+        (mf() - 0.2) * 1.2,
+        Math.sin(theta) + (mf() - 0.5) * 0.4,
+      ).normalize();
+      mDir[base] = drift.x;
+      mDir[base + 1] = drift.y;
+      mDir[base + 2] = drift.z;
+    }
+    const mGeo = new THREE.BufferGeometry();
+    mGeo.setAttribute("position", new THREE.BufferAttribute(mPos, 3));
+    const mMat = new THREE.PointsMaterial({
+      color: 0xffd7aa,
+      size: 0.02,
+      transparent: true,
+      opacity: 0.0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    root.add(new THREE.Points(mGeo, mMat));
+
     // ── Pointer ───────────────────────────────────────────────────────────────
     const ptr  = { x: 0, y: 0 };
     const ndc  = new THREE.Vector2();
     const ray  = new THREE.Raycaster();
     const lcur = new THREE.Vector3();
-    const onPtr = (e: PointerEvent) => { ptr.x = (e.clientX / window.innerWidth) * 2 - 1; ptr.y = -((e.clientY / window.innerHeight) * 2 - 1); };
-    const onTch = (e: TouchEvent)   => { const t = e.touches[0]; if (t) { ptr.x = (t.clientX / window.innerWidth) * 2 - 1; ptr.y = -((t.clientY / window.innerHeight) * 2 - 1); } };
+    const onPtr = (e: PointerEvent) => {
+      ptr.x = (e.clientX / window.innerWidth) * 2 - 1;
+      ptr.y = -((e.clientY / window.innerHeight) * 2 - 1);
+      shellRef.current?.style.setProperty("--hero-pointer-x", `${(e.clientX / window.innerWidth) * 100}%`);
+      shellRef.current?.style.setProperty("--hero-pointer-y", `${(e.clientY / window.innerHeight) * 100}%`);
+    };
+    const onTch = (e: TouchEvent)   => {
+      const t = e.touches[0];
+      if (t) {
+        ptr.x = (t.clientX / window.innerWidth) * 2 - 1;
+        ptr.y = -((t.clientY / window.innerHeight) * 2 - 1);
+        shellRef.current?.style.setProperty("--hero-pointer-x", `${(t.clientX / window.innerWidth) * 100}%`);
+        shellRef.current?.style.setProperty("--hero-pointer-y", `${(t.clientY / window.innerHeight) * 100}%`);
+      }
+    };
     window.addEventListener("pointermove", onPtr);
     window.addEventListener("touchmove",   onTch, { passive: true });
 
@@ -288,12 +366,15 @@ export default function PlaygroundHero({ heading, copy }: PlaygroundHeroProps) {
       root.rotation.y = t * 0.13 + ptr.x * 0.18;
       root.rotation.x = ptr.y * 0.09 + Math.sin(t * 0.3) * 0.018;
 
-      keyL.position.set(Math.sin(t * 0.34) * 5 + 2, Math.cos(t * 0.22) * 3 + 5, 9 + Math.sin(t * 0.28) * 2);
-      keyL.intensity = 38 + Math.sin(t * 0.6) * 8;
-
-      // Yolk
       const crack   = smoothstep(0.05, 0.9, sp);
       const crisis  = smoothstep(0.35, 0.9, sp);
+
+      keyL.position.set(Math.sin(t * 0.34) * 5 + 2, Math.cos(t * 0.22) * 3 + 5, 9 + Math.sin(t * 0.28) * 2);
+      keyL.intensity = 34 + crack * 6 + Math.sin(t * 0.6) * (6 + crack * 4);
+      rimL.intensity = 15 + crack * 9 + Math.sin(t * 0.4 + 1.2) * 4;
+      ambient.intensity = 4.7 + crack * 1.5;
+
+      // Yolk
       yolkMat.emissiveIntensity = 1.8 + crack * 4.5 + Math.sin(t * 8) * crisis * 1.2;
       yolkL.intensity = 6 + crack * 22 + Math.random() * crisis * 14;
       yolkL.color.setRGB(1.0, 0.47 - crisis * 0.22, 0);
@@ -324,6 +405,36 @@ export default function PlaygroundHero({ heading, copy }: PlaygroundHeroProps) {
         pVel[s+2] += (tz - pArr[s+2]) * 0.04; pVel[s+2] *= 0.78; pArr[s+2] += pVel[s+2];
       }
       pGeo.attributes.position.needsUpdate = true;
+
+      // Ambient dust
+      dMat.opacity = 0.18 + crack * 0.12;
+      const dArr = dGeo.attributes.position.array as Float32Array;
+      for (let i = 0; i < DC; i++) {
+        const base = i * 3;
+        dArr[base] += dVel[base] + ptr.x * 0.0009;
+        dArr[base + 1] += dVel[base + 1] + Math.sin(t * 0.5 + i * 0.4) * 0.0007;
+        dArr[base + 2] += dVel[base + 2] + ptr.y * 0.0006;
+
+        if (dArr[base + 1] > 4.8) dArr[base + 1] = -4.8;
+        if (dArr[base] > 6) dArr[base] = -6;
+        if (dArr[base] < -6) dArr[base] = 6;
+        if (dArr[base + 2] > 3.8) dArr[base + 2] = -3.8;
+        if (dArr[base + 2] < -3.8) dArr[base + 2] = 3.8;
+      }
+      dGeo.attributes.position.needsUpdate = true;
+
+      // Micro fragments
+      const fragAct = smoothstep(0.12, 0.46, sp);
+      mMat.opacity = fragAct * 0.45;
+      const mArr = mGeo.attributes.position.array as Float32Array;
+      for (let i = 0; i < MC; i++) {
+        const base = i * 3;
+        const amp = fragAct * (1.1 + (i % 6) * 0.12);
+        mArr[base] = mBase[base] + mDir[base] * amp + Math.sin(t * 0.7 + i) * 0.04;
+        mArr[base + 1] = mBase[base + 1] + mDir[base + 1] * amp * 1.1 + Math.cos(t * 0.9 + i * 0.6) * 0.03;
+        mArr[base + 2] = mBase[base + 2] + mDir[base + 2] * amp + Math.sin(t * 0.8 + i * 0.35) * 0.03;
+      }
+      mGeo.attributes.position.needsUpdate = true;
 
       // Cursor world position in root local space
       ndc.set(ptr.x, ptr.y);
@@ -389,6 +500,8 @@ export default function PlaygroundHero({ heading, copy }: PlaygroundHeroProps) {
       if (document.body.contains(canvas)) document.body.removeChild(canvas);
       pieceGeos.forEach(g => g.dispose());
       pGeo.dispose(); pMat.dispose();
+      dGeo.dispose(); dMat.dispose();
+      mGeo.dispose(); mMat.dispose();
       yolkGeo.dispose(); yolkMat.dispose();
       albGeo.dispose(); albMat.dispose();
       shellMat.dispose();
@@ -415,7 +528,6 @@ export default function PlaygroundHero({ heading, copy }: PlaygroundHeroProps) {
           <p className="playground-hero-copy">{copy}</p>
         </div>
       </div>
-
       <div className="playground-hero-scrollcue" aria-hidden="true">
         <span className="playground-hero-scrollcue-line" />
         <span className="playground-hero-scrollcue-text">Scroll to crack it open.</span>
