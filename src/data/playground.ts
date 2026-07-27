@@ -35,8 +35,8 @@ export function groupPlaygroundRows(
 export const playgroundPanels: PlaygroundPanel[] = [
   {
     slug: "endless-drive",
-    title: "Endless Drive",
-    summary: "A procedural road through rolling dusk hills. The landscape generates itself. You just drive.",
+    title: "Wander",
+    summary: "An endless, procedural scenic drive through the seasons — day and night, weather that rolls in on its own, and a road that never repeats.",
     statusLabel: "incubating",
     tags: ["three.js", "procedural", "driving"],
     tone: "ember",
