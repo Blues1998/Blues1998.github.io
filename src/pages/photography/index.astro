@@ -3,7 +3,7 @@ import { getImage } from "astro:assets";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import metadataList from "../../assets/photography/metadata.json";
 
-// Dynamically discover all images — no filenames hard-coded
+// Dynamically discover all images, no filenames hard-coded
 const imageModules = import.meta.glob(
   "../../assets/photography/*.{jpg,jpeg,png,webp}",
   { eager: true }
@@ -31,7 +31,7 @@ const photos = await Promise.all(
 ---
 
 <BaseLayout
-  title="Photography — Animesh Singh"
+  title="Photography - Animesh Singh"
   description="A curated, immersive selection of photographs."
 >
   <section>

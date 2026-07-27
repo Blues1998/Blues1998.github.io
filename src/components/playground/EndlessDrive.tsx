@@ -6,12 +6,12 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
 /*
- * "Wander" — a procedural, endless scenic drive.
+ * "Wander": a procedural, endless scenic drive.
  * Ported from a standalone prototype (three.js + custom GLSL) into a managed
  * React effect. The simulation (road/terrain/vegetation generation, car
  * physics, day/night + season + weather cycle, WebAudio engine synthesis) is
- * kept intact; only the integration seams changed — module imports, DOM
- * scoping, mount/cleanup — to fit this component's lifecycle.
+ * kept intact; only the integration seams changed (module imports, DOM
+ * scoping, mount/cleanup) to fit this component's lifecycle.
  */
 
 // ============================== utils ==============================
@@ -1541,7 +1541,7 @@ export default function EndlessDrive() {
       const fx = Math.sin(car.heading),
         fz = Math.cos(car.heading);
 
-      /* ride height from the four wheel contact patches — body stays planted */
+      /* ride height from the four wheel contact patches, body stays planted */
       const gFL = sampleGround(car.x + fx * 1.45 - fz * 0.86, car.z + fz * 1.45 + fx * 0.86);
       const gFR = sampleGround(car.x + fx * 1.45 + fz * 0.86, car.z + fz * 1.45 - fx * 0.86);
       const gRL = sampleGround(car.x - fx * 1.45 - fz * 0.86, car.z - fz * 1.45 + fx * 0.86);

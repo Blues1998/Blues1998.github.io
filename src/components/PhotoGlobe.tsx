@@ -245,7 +245,7 @@ export default function PhotoGlobe({ photos }: { photos: PhotoMeta[] }) {
           return wrapper;
         });
 
-      // Boost ambient light — full globe visible, no dark night-side
+      // Boost ambient light, full globe visible, no dark night-side
       const scene = (globe as any).scene?.();
       if (scene) {
         scene.traverse((obj: any) => {

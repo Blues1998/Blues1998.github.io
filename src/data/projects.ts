@@ -8,31 +8,24 @@ export interface CuratedProject {
 }
 
 // Public repos to feature on the Projects page. Everything else on GitHub
-// stays unlisted here — the portfolio is curated, not a full repo mirror.
+// stays unlisted here: the portfolio is curated, not a full repo mirror.
 export const FEATURED_REPO_NAMES = ["TypingTest1"];
 
 // Private repos with no public GitHub page. Summaries are hand-written,
 // sourced from each repo's own README, since there's nothing to fetch live.
 export const privateProjects: CuratedProject[] = [
   {
-    slug: "dentos",
-    title: "DentOS",
-    summary:
-      "A complete dental practice management system — scheduling, billing/GST invoicing, WhatsApp automation, and a patient portal — shipped as web + native mobile apps.",
-    tech: ["TypeScript", "Supabase", "React Native"],
-  },
-  {
     slug: "connekt",
     title: "Connekt",
     summary:
-      "An offline-first, transport-agnostic P2P messaging engine in Rust — bridges BLE, Wi-Fi Direct, and cloud relay into one mesh, with a Flutter client over FFI.",
+      "An offline-first, transport-agnostic P2P messaging engine in Rust that bridges BLE, Wi-Fi Direct, and cloud relay into one mesh, with a Flutter client over FFI.",
     tech: ["Rust", "Flutter", "P2P"],
   },
   {
     slug: "cliphoard",
     title: "ClipHoard",
     summary:
-      "Cross-platform clipboard sync between macOS and Android over a lightweight WebSocket relay — copy on one device, paste on the other in seconds.",
+      "Cross-platform clipboard sync between macOS and Android over a lightweight WebSocket relay: copy on one device, paste on the other in seconds.",
     tech: ["Swift", "Kotlin", "Python"],
   },
   {
@@ -44,7 +37,7 @@ export const privateProjects: CuratedProject[] = [
   {
     slug: "cadenza",
     title: "Cadenza",
-    summary: "An interactive music theory companion — fretboard, circle of fifths, and piano visualizations, with light and dark themes.",
+    summary: "An interactive music theory companion with fretboard, circle of fifths, and piano visualizations, in light and dark themes.",
     tech: ["TypeScript"],
   },
 ];

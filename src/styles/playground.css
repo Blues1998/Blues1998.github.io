@@ -65,7 +65,7 @@ body.playground-page::before {
   --hero-pointer-x: 50%;
   --hero-pointer-y: 34%;
   position: relative;
-  /* tall scroll container — Three.js canvas is fixed so it stays on screen while user scrolls */
+  /* tall scroll container: Three.js canvas is fixed so it stays on screen while user scrolls */
   min-height: 300vh;
 }
 
@@ -100,7 +100,7 @@ body.playground-page::before {
   position: sticky;
   top: 0;
   height: 100vh;
-  /* no transform/opacity animation here — canvas handles all that */
+  /* no transform/opacity animation here, canvas handles all that */
 }
 
 .playground-hero-canvas,
