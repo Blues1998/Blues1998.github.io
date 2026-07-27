@@ -1,17 +1,12 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import ProjectCard from "../components/ProjectCard.astro";
-import { getPublicRepos, repoSlug, repoTech } from "../lib/github";
+import { getCuratedProjects } from "../data/projects";
 
 const base = import.meta.env.BASE_URL;
 
-// Top 4 repos by stars, then most recently pushed
-const allRepos = await getPublicRepos();
-allRepos.sort((a, b) => {
-  if (b.stargazers_count !== a.stargazers_count) return b.stargazers_count - a.stargazers_count;
-  return new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime();
-});
-const featured = allRepos.slice(0, 4);
+const projects = await getCuratedProjects();
+const featured = projects.slice(0, 4);
 ---
 
 <BaseLayout
@@ -49,12 +44,13 @@ const featured = allRepos.slice(0, 4);
     <h2>Selected work</h2>
 
     <div class="project-grid">
-      {featured.map((repo) => (
+      {featured.map((p) => (
         <ProjectCard
-          title={repo.name}
-          summary={repo.description ?? "No description."}
-          href={`/projects/${repoSlug(repo)}/`}
-          tech={repoTech(repo)}
+          title={p.title}
+          summary={p.summary}
+          href={p.href}
+          tech={p.tech}
+          isPrivate={p.isPrivate}
         />
       ))}
     </div>

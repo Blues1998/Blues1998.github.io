@@ -1,16 +1,15 @@
 ---
-const { title, summary, href, tech } = Astro.props;
+const { title, summary, href, tech, isPrivate } = Astro.props;
 const base = import.meta.env.BASE_URL;
 
 // Ensure no double slashes
-const resolvedHref = `${base}${href.replace(/^\//, "")}`;
+const resolvedHref = href ? `${base}${href.replace(/^\//, "")}` : undefined;
 ---
 
 <article class="project-card">
   <h3>
-    <a href={resolvedHref}>
-      {title}
-    </a>
+    {resolvedHref ? <a href={resolvedHref}>{title}</a> : title}
+    {isPrivate && <span class="project-private-badge">Private</span>}
   </h3>
 
   <p class="project-meta">{summary}</p>

@@ -239,6 +239,20 @@ footer {
   margin-right: 0.3rem;
 }
 
+.project-private-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  vertical-align: middle;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  color: var(--color-muted);
+  border: 1px solid var(--color-border);
+}
+
 /* ---------- Project detail content ---------- */
 .project-content {
   max-width: var(--max-width);

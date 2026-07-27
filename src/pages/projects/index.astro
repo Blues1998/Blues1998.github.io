@@ -1,29 +1,23 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import ProjectCard from "../../components/ProjectCard.astro";
-import { getPublicRepos, repoSlug, repoTech } from "../../lib/github";
+import { getCuratedProjects } from "../../data/projects";
 
-const repos = await getPublicRepos();
+const projects = await getCuratedProjects();
 
-// Sort: stars descending, then by most recently pushed
-repos.sort((a, b) => {
-  if (b.stargazers_count !== a.stargazers_count) return b.stargazers_count - a.stargazers_count;
-  return new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime();
-});
-
-// Collect all unique tech tags across repos
-const allTech = [...new Set(repos.flatMap(repoTech))].sort();
+// Collect all unique tech tags across the curated set
+const allTech = [...new Set(projects.flatMap((p) => p.tech))].sort();
 ---
 
 <BaseLayout
   title="Projects — Animesh Singh"
-  description="Public engineering projects on GitHub."
+  description="Selected engineering projects — shipped products and public code."
 >
   <section>
     <h1>Projects</h1>
 
     <p class="project-overview">
-      {repos.length} public {repos.length === 1 ? "repo" : "repos"} on GitHub
+      {projects.length} selected {projects.length === 1 ? "project" : "projects"}
     </p>
 
     {allTech.length > 0 && (
@@ -38,16 +32,17 @@ const allTech = [...new Set(repos.flatMap(repoTech))].sort();
     )}
 
     <div class="project-grid" id="project-grid">
-      {repos.map((repo) => (
+      {projects.map((p) => (
         <div
           class="project-card-wrapper"
-          data-techs={JSON.stringify(repoTech(repo))}
+          data-techs={JSON.stringify(p.tech)}
         >
           <ProjectCard
-            title={repo.name}
-            summary={repo.description ?? "No description."}
-            href={`/projects/${repoSlug(repo)}/`}
-            tech={repoTech(repo)}
+            title={p.title}
+            summary={p.summary}
+            href={p.href}
+            tech={p.tech}
+            isPrivate={p.isPrivate}
           />
         </div>
       ))}

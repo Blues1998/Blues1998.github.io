@@ -1,10 +1,13 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { getPublicRepos, getRepoReadme, repoSlug, repoTech } from "../../lib/github";
+import { FEATURED_REPO_NAMES } from "../../data/projects";
 import { marked } from "marked";
 
 export async function getStaticPaths() {
-  const repos = await getPublicRepos();
+  // Only build detail pages for repos curated onto the Projects page —
+  // the rest stay unlisted rather than generating orphaned routes.
+  const repos = (await getPublicRepos()).filter((r) => FEATURED_REPO_NAMES.includes(r.name));
 
   return await Promise.all(
     repos.map(async (repo) => {
