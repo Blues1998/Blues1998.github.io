@@ -1,0 +1,274 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><!-- Theme init (must be first in head to prevent FOUC) --><script>
+      (function() {
+        var LOG = "[ThemeInit]";
+        try {
+          var t = localStorage.getItem("theme");
+          console.debug(LOG, "Init start.", { storedTheme: t });
+
+          if (t === "dark" || t === "light") {
+            document.documentElement.setAttribute("data-theme", t);
+            console.debug(LOG, "Applied stored theme.", { theme: t });
+          } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+            document.documentElement.setAttribute("data-theme", "dark");
+            console.debug(LOG, "Applied system dark theme.");
+          } else {
+            console.debug(LOG, "No stored or dark system theme, using light defaults.");
+          }
+
+          // Keep in sync if system theme changes while page is open (only when no manual override)
+          window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function(e) {
+            try {
+              console.debug(LOG, "System theme changed.", { matchesDark: e.matches });
+              if (!localStorage.getItem("theme")) {
+                document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
+                console.debug(LOG, "Applied system-driven theme change.", {
+                  theme: e.matches ? "dark" : "light",
+                });
+              } else {
+                console.debug(LOG, "Ignoring system change due to stored manual theme.");
+              }
+            } catch(err) {
+              console.error(LOG, "Failed handling system theme change.", err);
+            }
+          });
+        } catch(e) {
+          console.error(LOG, "Theme initialization failed.", e);
+        }
+      })();
+    </script><title>Photography - Animesh Singh</title><meta name="description" content="A curated, immersive selection of photographs."><!-- Canonical --><link rel="canonical" href="https://blues1998.github.io/photography/"><!-- Open Graph --><meta property="og:title" content="Photography - Animesh Singh"><meta property="og:description" content="A curated, immersive selection of photographs."><meta property="og:type" content="website"><meta property="og:url" content="https://blues1998.github.io/photography/"><meta property="og:image" content="https://blues1998.github.io/images/og-default.png"><meta property="og:site_name" content="Animesh Singh"><meta property="og:locale" content="en_US"><!-- Twitter --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Photography - Animesh Singh"><meta name="twitter:description" content="A curated, immersive selection of photographs."><meta name="twitter:image" content="https://blues1998.github.io/images/og-default.png"><!-- RSS --><link rel="alternate" type="application/rss+xml" title="Animesh Singh" href="/rss.xml"><!-- Fonts --><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;500;600&display=swap" rel="stylesheet"><style>.photo-header[data-astro-cid-cngsfqja]{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:var(--space-3);margin-bottom:var(--space-1)}.photo-header-left[data-astro-cid-cngsfqja]{display:flex;align-items:baseline;gap:var(--space-3)}.photo-header[data-astro-cid-cngsfqja] h1[data-astro-cid-cngsfqja]{margin:0}.photo-nav[data-astro-cid-cngsfqja]{display:flex;gap:var(--space-2);font-size:var(--font-size-sm)}.photo-nav[data-astro-cid-cngsfqja] a[data-astro-cid-cngsfqja]{color:var(--color-muted);text-decoration:none;padding-bottom:2px;border-bottom:1px solid transparent;transition:color var(--transition-fast),border-color var(--transition-fast)}.photo-nav[data-astro-cid-cngsfqja] a[data-astro-cid-cngsfqja]:hover{color:var(--color-text)}.photo-nav[data-astro-cid-cngsfqja] a[data-astro-cid-cngsfqja].active{color:var(--color-text);border-bottom-color:var(--color-accent)}
+</style>
+<link rel="stylesheet" href="/astro/index.7pay0IOh.css">
+<style>:root{--color-bg: #fafaf9;--color-text: #1c1e21;--color-muted: #5f6368;--color-accent: #5563de;--color-border: rgba(28, 30, 33, .1);--font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;--font-heading: "Source Serif 4", Georgia, serif;--font-size-base: 18px;--line-height-base: 1.65;--font-size-sm: .9rem;--font-size-lg: 1.2rem;--font-size-xl: 1.6rem;--font-size-xxl: 2.2rem;--max-width: 70ch;--space-1: .5rem;--space-2: 1rem;--space-3: 1.5rem;--space-4: 2rem;--space-5: 3rem;--space-6: 4rem;--transition-fast: .15s ease;--transition-base: .25s ease;--radius-sm: 4px;--radius-md: 6px}*,*:before,*:after{box-sizing:border-box}html{font-size:var(--font-size-base)}body{margin:0;font-family:var(--font-body);line-height:var(--line-height-base);color:var(--color-text);background-color:var(--color-bg);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}:root.theme-transitioning,:root.theme-transitioning *,:root.theme-transitioning *:before,:root.theme-transitioning *:after{transition:background-color .55s ease,color .55s ease,border-color .55s ease,box-shadow .55s ease!important}@media(prefers-reduced-motion:reduce){:root.theme-transitioning,:root.theme-transitioning *,:root.theme-transitioning *:before,:root.theme-transitioning *:after{transition:none!important}}h1,h2,h3,h4{font-family:var(--font-heading);font-weight:500;line-height:1.25;margin-top:0}h1{font-size:var(--font-size-xxl);margin-bottom:var(--space-3)}h2{font-size:var(--font-size-xl);margin-bottom:var(--space-2)}h3{font-size:var(--font-size-lg);margin-bottom:var(--space-2)}p{margin-top:0;margin-bottom:var(--space-3)}small{font-size:var(--font-size-sm);color:var(--color-muted)}a{color:var(--color-accent);text-decoration:none}a:hover{text-decoration:underline}a:focus-visible{outline:2px solid var(--color-accent);outline-offset:3px}main{display:block;padding:var(--space-5) var(--space-3)}section{max-width:var(--max-width);margin-left:auto;margin-right:auto;margin-bottom:var(--space-6)}img,video{max-width:100%;height:auto;display:block}:focus-visible{outline:2px solid var(--color-accent);outline-offset:3px}
+</style></head> <body> <nav aria-label="Primary"> <div class="nav-container"> <a href="/" class="nav-brand">Animesh Singh</a> <div class="nav-right"> <ul class="nav-links"> <li><a href="/playground/">Playground</a></li> <li><a href="/projects/">Projects</a></li> <li><a href="/photography/" aria-current="page">Photography</a></li> <li><a href="/music/">Music</a></li> <li><a href="/about/">About</a></li> <li><a href="/contact/">Contact</a></li> </ul> <button class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode" data-astro-cid-x3pjskd3> <span class="theme-icon sun" data-astro-cid-x3pjskd3>☀️</span> <span class="theme-icon moon" data-astro-cid-x3pjskd3>🌙</span> </button>  <script>
+  (function() {
+    var LOG = "[ThemeToggle]";
+    var TRANSITION_MS = 550;
+    var btn = document.querySelector(".theme-toggle");
+    if (!btn) {
+      console.error(LOG, "Toggle button not found.");
+      return;
+    }
+
+    if (btn.getAttribute("data-theme-bound") === "true") {
+      console.debug(LOG, "Toggle handler already attached.");
+      return;
+    }
+
+    btn.setAttribute("data-theme-bound", "true");
+    console.debug(LOG, "Binding click handler.", {
+      initialThemeAttr: document.documentElement.getAttribute("data-theme"),
+    });
+
+    btn.addEventListener("click", function() {
+      var html = document.documentElement;
+      var current = html.getAttribute("data-theme");
+      var next = current === "dark" ? "light" : "dark";
+
+      console.debug(LOG, "Click detected.", {
+        currentTheme: current,
+        nextTheme: next,
+      });
+
+      try {
+        html.classList.add("theme-transitioning");
+        window.setTimeout(function() {
+          html.classList.remove("theme-transitioning");
+        }, TRANSITION_MS);
+      } catch (err) {
+        console.error(LOG, "Failed to apply transition class.", err);
+      }
+
+      try {
+        html.setAttribute("data-theme", next);
+        console.debug(LOG, "Applied data-theme on <html>.", {
+          dataTheme: html.getAttribute("data-theme"),
+        });
+      } catch (err) {
+        console.error(LOG, "Failed to set data-theme attribute.", err);
+      }
+
+      try {
+        localStorage.setItem("theme", next);
+        console.debug(LOG, "Persisted theme in localStorage.", {
+          storedTheme: localStorage.getItem("theme"),
+        });
+      } catch (err) {
+        console.error(LOG, "Failed to persist theme in localStorage.", err);
+      }
+    });
+  })();
+</script> </div> </div> </nav> <main id="main">  <section data-astro-cid-cngsfqja> <div class="photo-header" data-astro-cid-cngsfqja> <div class="photo-header-left" data-astro-cid-cngsfqja> <h1 data-astro-cid-cngsfqja>Photography</h1> <nav class="photo-nav" aria-label="Photography views" data-astro-cid-cngsfqja> <a href="/photography" class="active" aria-current="page" data-astro-cid-cngsfqja>Grid</a> <a href="/photography/map" data-astro-cid-cngsfqja>Map</a> </nav> </div> </div> <p data-astro-cid-cngsfqja>
+Finished frames. Viewed slowly. Context available when you want it.
+</p> </section> <section data-astro-cid-cngsfqja> <div class="photo-grid" data-astro-cid-cngsfqja> <button type="button" aria-label="Open Tired dog" data-index="0" data-astro-cid-cngsfqja> <img src="/astro/photo-01.D3Li8LlP_Z1dun7b.webp" alt="Tired dog" loading="eager" width="800" height="534" data-astro-cid-cngsfqja> </button><button type="button" aria-label="Open Beach bod" data-index="1" data-astro-cid-cngsfqja> <img src="/astro/photo-02.BGJ1wQxo_2a8zi2.webp" alt="Beach bod" loading="lazy" width="800" height="534" data-astro-cid-cngsfqja> </button><button type="button" aria-label="Open Red skies" data-index="2" data-astro-cid-cngsfqja> <img src="/astro/photo-03.Cl18rUy9_1fGHG5.webp" alt="Red skies" loading="lazy" width="800" height="534" data-astro-cid-cngsfqja> </button><button type="button" aria-label="Open Quiet strength" data-index="3" data-astro-cid-cngsfqja> <img src="/astro/photo-04.B4DqoU-A_LlokF.webp" alt="Quiet strength" loading="lazy" width="800" height="534" data-astro-cid-cngsfqja> </button><button type="button" aria-label="Open Eye contact" data-index="4" data-astro-cid-cngsfqja> <img src="/astro/photo-05.k3b7BxBp_ZWa49n.webp" alt="Eye contact" loading="lazy" width="800" height="534" data-astro-cid-cngsfqja> </button><button type="button" aria-label="Open Desolation" data-index="5" data-astro-cid-cngsfqja> <img src="/astro/photo-06.DCDnfGgw_Z2kQPhG.webp" alt="Desolation" loading="lazy" width="800" height="534" data-astro-cid-cngsfqja> </button> </div> </section>  <div class="viewer" aria-hidden="true" role="dialog" aria-label="Photo viewer" data-astro-cid-cngsfqja> <div class="viewer-stage" data-astro-cid-cngsfqja> <img class="viewer-image" src="" alt="" draggable="false" data-astro-cid-cngsfqja> <div class="viewer-caption" data-astro-cid-cngsfqja></div> </div> <button class="info-toggle" aria-label="Toggle photo information" type="button" data-astro-cid-cngsfqja>
+i
+</button> <button class="viewer-close" aria-label="Close viewer" type="button" data-astro-cid-cngsfqja>
+✕
+</button> <aside class="info-panel" data-astro-cid-cngsfqja> <div class="info-title" data-astro-cid-cngsfqja></div> <div class="info-meta" data-astro-cid-cngsfqja></div> <div class="info-settings" data-astro-cid-cngsfqja></div> </aside> </div> <script type="application/json" id="photo-data">[{"file":"photo-01.jpg","title":"Tired dog","location":"Gangtok, India","lat":27.3389,"lng":88.6065,"date":"Jan 2024","camera":"Sony A7III","settings":"50mm · f/1.8 · ISO 200 · 1/250","thumbSrc":"/astro/photo-01.D3Li8LlP_Z1dun7b.webp","viewerSrc":"/astro/photo-01.D3Li8LlP_1KVKPK.webp"},{"file":"photo-02.jpg","title":"Beach bod","location":"Goa, India","lat":15.2993,"lng":74.124,"date":"Feb 2024","camera":"Sony A7III","settings":"35mm · f/2 · ISO 400 · 1/125","thumbSrc":"/astro/photo-02.BGJ1wQxo_2a8zi2.webp","viewerSrc":"/astro/photo-02.BGJ1wQxo_Zqzwg.webp"},{"file":"photo-03.jpg","title":"Red skies","location":"Tosh, India","lat":32.0781,"lng":77.3397,"date":"Aug 2023","camera":"Sony A7III","settings":"85mm · f/2 · ISO 320 · 1/500","thumbSrc":"/astro/photo-03.Cl18rUy9_1fGHG5.webp","viewerSrc":"/astro/photo-03.Cl18rUy9_2k6xAR.webp"},{"file":"photo-04.jpg","title":"Quiet strength","location":"Gangtok, India","lat":27.3389,"lng":88.6065,"date":"Aug 2023","camera":"Sony A7III","settings":"85mm · f/2 · ISO 320 · 1/500","thumbSrc":"/astro/photo-04.B4DqoU-A_LlokF.webp","viewerSrc":"/astro/photo-04.B4DqoU-A_Z2pjYCX.webp"},{"file":"photo-05.jpg","title":"Eye contact","location":"Manali, India","lat":32.2432,"lng":77.1892,"date":"Aug 2023","camera":"Sony A7III","settings":"85mm · f/2 · ISO 320 · 1/500","thumbSrc":"/astro/photo-05.k3b7BxBp_ZWa49n.webp","viewerSrc":"/astro/photo-05.k3b7BxBp_Z67RTd.webp"},{"file":"photo-06.jpg","title":"Desolation","location":"Gangtok, India","lat":27.3389,"lng":88.6065,"date":"Aug 2023","camera":"Sony A7III","settings":"85mm · f/2 · ISO 320 · 1/500","thumbSrc":"/astro/photo-06.DCDnfGgw_Z2kQPhG.webp","viewerSrc":"/astro/photo-06.DCDnfGgw_Z2sgFzo.webp"}]</script> <script>
+    (() => {
+      const photoData = JSON.parse(
+        document.getElementById("photo-data").textContent.trim()
+      );
+
+      const viewer = document.querySelector(".viewer");
+      const viewerImage = document.querySelector(".viewer-image");
+      const captionEl = document.querySelector(".viewer-caption");
+      const infoToggle = document.querySelector(".info-toggle");
+      const infoPanel = document.querySelector(".info-panel");
+      const closeBtn = document.querySelector(".viewer-close");
+
+      const titleEl = infoPanel.querySelector(".info-title");
+      const metaEl = infoPanel.querySelector(".info-meta");
+      const settingsEl = infoPanel.querySelector(".info-settings");
+
+      let currentIndex = 0;
+      let infoOpen = false;
+
+      function openViewer(index) {
+        currentIndex = index;
+        const p = photoData[index];
+
+        viewerImage.classList.add("is-loading");
+        viewerImage.onload  = () => viewerImage.classList.remove("is-loading");
+        viewerImage.onerror = () => viewerImage.classList.remove("is-loading");
+
+        viewerImage.src = p.viewerSrc;
+        viewerImage.alt = p.title;
+        captionEl.textContent = p.title;
+
+        titleEl.textContent = p.title;
+        metaEl.textContent = `${p.location} · ${p.date}`;
+        settingsEl.textContent = `${p.camera} · ${p.settings}`;
+
+        infoOpen = false;
+        viewer.classList.remove("with-info");
+
+        viewer.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+      }
+
+      function closeViewer() {
+        viewer.setAttribute("aria-hidden", "true");
+        viewer.classList.remove("with-info");
+        infoOpen = false;
+        document.body.style.overflow = "";
+      }
+
+      function toggleInfo() {
+        infoOpen = !infoOpen;
+        viewer.classList.toggle("with-info", infoOpen);
+      }
+
+      function nextPhoto() {
+        openViewer((currentIndex + 1) % photoData.length);
+      }
+
+      function prevPhoto() {
+        openViewer((currentIndex - 1 + photoData.length) % photoData.length);
+      }
+
+      /* ── Grid clicks ─────────────────────────── */
+      document.querySelectorAll(".photo-grid button").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          openViewer(Number(btn.dataset.index));
+        });
+      });
+
+      /* ── Viewer buttons ──────────────────────── */
+      infoToggle.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleInfo();
+      });
+
+      closeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        closeViewer();
+      });
+
+      /* ── Click backdrop to close ─────────────── */
+      viewer.addEventListener("click", (e) => {
+        if (e.target === viewer || e.target.classList.contains("viewer-stage")) {
+          closeViewer();
+        }
+      });
+
+      /* ── Keyboard ────────────────────────────── */
+      document.addEventListener("keydown", (e) => {
+        if (viewer.getAttribute("aria-hidden") === "true") return;
+
+        if (e.key === "Escape") closeViewer();
+        if (e.key === "i" || e.key === "I") toggleInfo();
+        if (e.key === "ArrowRight") nextPhoto();
+        if (e.key === "ArrowLeft") prevPhoto();
+      });
+
+      /* ── Touch support ───────────────────────── */
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let touchStartTime = 0;
+
+      viewer.addEventListener(
+        "touchstart",
+        (e) => {
+          if (e.touches.length !== 1) return;
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+          touchStartTime = Date.now();
+        },
+        { passive: true }
+      );
+
+      viewer.addEventListener(
+        "touchend",
+        (e) => {
+          if (e.changedTouches.length !== 1) return;
+
+          const dx = e.changedTouches[0].clientX - touchStartX;
+          const dy = e.changedTouches[0].clientY - touchStartY;
+          const dt = Date.now() - touchStartTime;
+
+          const absDx = Math.abs(dx);
+          const absDy = Math.abs(dy);
+
+          // Horizontal swipe
+          if (absDx > 50 && absDx > absDy && dt < 500) {
+            if (dx > 0) prevPhoto();
+            else nextPhoto();
+            return;
+          }
+
+          // Tap to close
+          if (absDx < 10 && absDy < 10 && dt < 300) {
+            const tag = e.target.tagName.toLowerCase();
+            if (tag !== "button") closeViewer();
+          }
+        },
+        { passive: true }
+      );
+
+      /* ── Disable right-click ─────────────────── */
+      viewerImage.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+      });
+
+      /* ── Deep-link: ?open=N ──────────────────── */
+      const params = new URLSearchParams(window.location.search);
+      const openParam = params.get("open");
+      if (openParam !== null) {
+        const idx = parseInt(openParam, 10);
+        if (!isNaN(idx) && idx >= 0 && idx < photoData.length) {
+          openViewer(idx);
+        }
+      }
+    })();
+  </script>  </main> <footer> <div class="footer-container"> <p class="footer-copy">
+&copy; 2026 Animesh Singh
+</p> <ul class="footer-links"> <li><a href="mailto:animesh98388@gmail.com">Email</a></li> <li><a href="https://github.com/Blues1998" target="_blank" rel="noopener noreferrer">GitHub</a></li> <li><a href="https://www.linkedin.com/in/animesh-singh-profile/" target="_blank" rel="noopener noreferrer">LinkedIn</a></li> </ul> </div> </footer> <!-- Hidden terminal trigger --> <script>
+      document.addEventListener("keydown", function(e) {
+        if (e.key === "~" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          var tag = (e.target.tagName || "").toLowerCase();
+          if (tag !== "input" && tag !== "textarea" && !e.target.isContentEditable) {
+            window.location.href = "/terminal/";
+          }
+        }
+      });
+    </script> </body> </html> 

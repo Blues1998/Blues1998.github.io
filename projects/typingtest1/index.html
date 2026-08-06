@@ -1,0 +1,236 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><!-- Theme init (must be first in head to prevent FOUC) --><script>
+      (function() {
+        var LOG = "[ThemeInit]";
+        try {
+          var t = localStorage.getItem("theme");
+          console.debug(LOG, "Init start.", { storedTheme: t });
+
+          if (t === "dark" || t === "light") {
+            document.documentElement.setAttribute("data-theme", t);
+            console.debug(LOG, "Applied stored theme.", { theme: t });
+          } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+            document.documentElement.setAttribute("data-theme", "dark");
+            console.debug(LOG, "Applied system dark theme.");
+          } else {
+            console.debug(LOG, "No stored or dark system theme, using light defaults.");
+          }
+
+          // Keep in sync if system theme changes while page is open (only when no manual override)
+          window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function(e) {
+            try {
+              console.debug(LOG, "System theme changed.", { matchesDark: e.matches });
+              if (!localStorage.getItem("theme")) {
+                document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
+                console.debug(LOG, "Applied system-driven theme change.", {
+                  theme: e.matches ? "dark" : "light",
+                });
+              } else {
+                console.debug(LOG, "Ignoring system change due to stored manual theme.");
+              }
+            } catch(err) {
+              console.error(LOG, "Failed handling system theme change.", err);
+            }
+          });
+        } catch(e) {
+          console.error(LOG, "Theme initialization failed.", e);
+        }
+      })();
+    </script><title>TypingTest1 - Animesh Singh</title><meta name="description" content="Basic keyboard typing test app"><!-- Canonical --><link rel="canonical" href="https://blues1998.github.io/projects/typingtest1/"><!-- Open Graph --><meta property="og:title" content="TypingTest1 - Animesh Singh"><meta property="og:description" content="Basic keyboard typing test app"><meta property="og:type" content="website"><meta property="og:url" content="https://blues1998.github.io/projects/typingtest1/"><meta property="og:image" content="https://blues1998.github.io/images/og-default.png"><meta property="og:site_name" content="Animesh Singh"><meta property="og:locale" content="en_US"><!-- Twitter --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="TypingTest1 - Animesh Singh"><meta name="twitter:description" content="Basic keyboard typing test app"><meta name="twitter:image" content="https://blues1998.github.io/images/og-default.png"><!-- RSS --><link rel="alternate" type="application/rss+xml" title="Animesh Singh" href="/rss.xml"><!-- Fonts --><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;500;600&display=swap" rel="stylesheet"><link rel="stylesheet" href="/astro/index.7pay0IOh.css">
+<style>:root{--color-bg: #fafaf9;--color-text: #1c1e21;--color-muted: #5f6368;--color-accent: #5563de;--color-border: rgba(28, 30, 33, .1);--font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;--font-heading: "Source Serif 4", Georgia, serif;--font-size-base: 18px;--line-height-base: 1.65;--font-size-sm: .9rem;--font-size-lg: 1.2rem;--font-size-xl: 1.6rem;--font-size-xxl: 2.2rem;--max-width: 70ch;--space-1: .5rem;--space-2: 1rem;--space-3: 1.5rem;--space-4: 2rem;--space-5: 3rem;--space-6: 4rem;--transition-fast: .15s ease;--transition-base: .25s ease;--radius-sm: 4px;--radius-md: 6px}*,*:before,*:after{box-sizing:border-box}html{font-size:var(--font-size-base)}body{margin:0;font-family:var(--font-body);line-height:var(--line-height-base);color:var(--color-text);background-color:var(--color-bg);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}:root.theme-transitioning,:root.theme-transitioning *,:root.theme-transitioning *:before,:root.theme-transitioning *:after{transition:background-color .55s ease,color .55s ease,border-color .55s ease,box-shadow .55s ease!important}@media(prefers-reduced-motion:reduce){:root.theme-transitioning,:root.theme-transitioning *,:root.theme-transitioning *:before,:root.theme-transitioning *:after{transition:none!important}}h1,h2,h3,h4{font-family:var(--font-heading);font-weight:500;line-height:1.25;margin-top:0}h1{font-size:var(--font-size-xxl);margin-bottom:var(--space-3)}h2{font-size:var(--font-size-xl);margin-bottom:var(--space-2)}h3{font-size:var(--font-size-lg);margin-bottom:var(--space-2)}p{margin-top:0;margin-bottom:var(--space-3)}small{font-size:var(--font-size-sm);color:var(--color-muted)}a{color:var(--color-accent);text-decoration:none}a:hover{text-decoration:underline}a:focus-visible{outline:2px solid var(--color-accent);outline-offset:3px}main{display:block;padding:var(--space-5) var(--space-3)}section{max-width:var(--max-width);margin-left:auto;margin-right:auto;margin-bottom:var(--space-6)}img,video{max-width:100%;height:auto;display:block}:focus-visible{outline:2px solid var(--color-accent);outline-offset:3px}
+</style></head> <body> <nav aria-label="Primary"> <div class="nav-container"> <a href="/" class="nav-brand">Animesh Singh</a> <div class="nav-right"> <ul class="nav-links"> <li><a href="/playground/">Playground</a></li> <li><a href="/projects/" aria-current="page">Projects</a></li> <li><a href="/photography/">Photography</a></li> <li><a href="/music/">Music</a></li> <li><a href="/about/">About</a></li> <li><a href="/contact/">Contact</a></li> </ul> <button class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode" data-astro-cid-x3pjskd3> <span class="theme-icon sun" data-astro-cid-x3pjskd3>☀️</span> <span class="theme-icon moon" data-astro-cid-x3pjskd3>🌙</span> </button>  <script>
+  (function() {
+    var LOG = "[ThemeToggle]";
+    var TRANSITION_MS = 550;
+    var btn = document.querySelector(".theme-toggle");
+    if (!btn) {
+      console.error(LOG, "Toggle button not found.");
+      return;
+    }
+
+    if (btn.getAttribute("data-theme-bound") === "true") {
+      console.debug(LOG, "Toggle handler already attached.");
+      return;
+    }
+
+    btn.setAttribute("data-theme-bound", "true");
+    console.debug(LOG, "Binding click handler.", {
+      initialThemeAttr: document.documentElement.getAttribute("data-theme"),
+    });
+
+    btn.addEventListener("click", function() {
+      var html = document.documentElement;
+      var current = html.getAttribute("data-theme");
+      var next = current === "dark" ? "light" : "dark";
+
+      console.debug(LOG, "Click detected.", {
+        currentTheme: current,
+        nextTheme: next,
+      });
+
+      try {
+        html.classList.add("theme-transitioning");
+        window.setTimeout(function() {
+          html.classList.remove("theme-transitioning");
+        }, TRANSITION_MS);
+      } catch (err) {
+        console.error(LOG, "Failed to apply transition class.", err);
+      }
+
+      try {
+        html.setAttribute("data-theme", next);
+        console.debug(LOG, "Applied data-theme on <html>.", {
+          dataTheme: html.getAttribute("data-theme"),
+        });
+      } catch (err) {
+        console.error(LOG, "Failed to set data-theme attribute.", err);
+      }
+
+      try {
+        localStorage.setItem("theme", next);
+        console.debug(LOG, "Persisted theme in localStorage.", {
+          storedTheme: localStorage.getItem("theme"),
+        });
+      } catch (err) {
+        console.error(LOG, "Failed to persist theme in localStorage.", err);
+      }
+    });
+  })();
+</script> </div> </div> </nav> <main id="main">  <section> <h1>TypingTest1</h1> <p>Basic keyboard typing test app</p> <div class="tech-badges"> <span class="tech-badge">JavaScript</span> </div> <p class="repo-meta">   <a href="https://github.com/Blues1998/TypingTest1" target="_blank" rel="noopener">
+View on GitHub →
+</a>  </p> </section> <section> <article class="project-content readme-content"><h1>typetest</h1>
+<p>A fast, minimal typing test app with multiple game modes, persistent stats, and a clean dark UI.</p>
+<p><strong>Live:</strong> <a href="https://blues1998.github.io/TypingTest1/">blues1998.github.io/TypingTest1</a></p>
+<p><img src="https://raw.githubusercontent.com/Blues1998/TypingTest1/main/screenshots/01-home.png" alt="Home screen"></p>
+<hr>
+<h2>Modes</h2>
+<h3>Typing</h3>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Stopwatch</strong></td>
+<td>Type at your own pace, press Enter when done</td>
+</tr>
+<tr>
+<td><strong>Countdown</strong></td>
+<td>Type as much as possible before time runs out (15 / 30 / 60 / 120s)</td>
+</tr>
+<tr>
+<td><strong>Word count</strong></td>
+<td>Race through an exact number of words (10 / 25 / 50 / 100)</td>
+</tr>
+<tr>
+<td><strong>Quotes</strong></td>
+<td>Famous quotes from literature and history</td>
+</tr>
+<tr>
+<td><strong>Code snippets</strong></td>
+<td>Real code - brackets, indentation and all</td>
+</tr>
+<tr>
+<td><strong>Daily challenge</strong></td>
+<td>Same passage for everyone, resets at midnight</td>
+</tr>
+</tbody></table>
+<h3>Challenge</h3>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Ghost race</strong></td>
+<td>Browse your recorded runs and race against your previous best on the same text</td>
+</tr>
+<tr>
+<td><strong>Stellar Drift</strong></td>
+<td>Asteroids fall from above - type the word on each to destroy it before they reach the planet</td>
+</tr>
+<tr>
+<td><strong>Survival</strong></td>
+<td>Type words to add time; run out and it&#39;s over</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Features</h2>
+<ul>
+<li><strong>Per-key accuracy heatmap</strong> - see your weakest keys across all sessions</li>
+<li><strong>Persistent stats</strong> - WPM history, accuracy trends, average over 7 / 30 / 90 days / all-time</li>
+<li><strong>Ghost replay</strong> - every stopwatch run records a replay; the ghost race lobby lets you pick a saved text and race your past self</li>
+<li><strong>Achievements</strong> - 26 badges across 4 tiers (Bronze → Diamond)</li>
+<li><strong>Daily streak</strong> - tracks consecutive days of practice</li>
+<li><strong>Customisation</strong> - caret style (line / block / underline), font (JetBrains Mono / Fira Code / system), dark/light theme</li>
+<li><strong>Language packs</strong> - English, Spanish, French, German</li>
+<li><strong>Text modifiers</strong> - inject numbers and punctuation into passages</li>
+<li><strong>Online leaderboard</strong> - powered by Supabase</li>
+</ul>
+<p><img src="https://raw.githubusercontent.com/Blues1998/TypingTest1/main/screenshots/02-typing-stopwatch.png" alt="Typing screen"></p>
+<hr>
+<h2>Tech stack</h2>
+<ul>
+<li><strong>React 19</strong> + <strong>Vite 8</strong></li>
+<li><strong>Tailwind CSS v4</strong> with CSS custom properties for theming</li>
+<li><strong>Framer Motion</strong> for page transitions and animations</li>
+<li><strong>Recharts</strong> for WPM history graphs</li>
+<li><strong>Supabase</strong> for leaderboard persistence</li>
+<li><strong>Vitest</strong> + <strong>@testing-library/react</strong> - 236 tests</li>
+</ul>
+<hr>
+<h2>Getting started</h2>
+<pre><code class="language-bash"># Install dependencies
+npm install
+
+# Start dev server
+npm run dev
+
+# Run tests
+npm test
+
+# Production build
+npm run build
+</code></pre>
+<h3>Leaderboard (optional)</h3>
+<p>The leaderboard requires a Supabase project. Copy <code>.env.local.example</code> to <code>.env.local</code> and fill in your project URL and anon key. The app works fully without it - the leaderboard page just won&#39;t save scores remotely.</p>
+<hr>
+<h2>Screenshots</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><img src="https://raw.githubusercontent.com/Blues1998/TypingTest1/main/screenshots/01-home.png" alt="Home"></td>
+<td><img src="https://raw.githubusercontent.com/Blues1998/TypingTest1/main/screenshots/02-typing-stopwatch.png" alt="Stopwatch"></td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/Blues1998/TypingTest1/main/screenshots/03-typing-countdown.png" alt="Countdown"></td>
+<td><img src="https://raw.githubusercontent.com/Blues1998/TypingTest1/main/screenshots/04-bubble.png" alt="Stellar Drift"></td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/Blues1998/TypingTest1/main/screenshots/05-leaderboard.png" alt="Leaderboard"></td>
+<td><img src="https://raw.githubusercontent.com/Blues1998/TypingTest1/main/screenshots/06-history.png" alt="History"></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>License</h2>
+<p><a href="LICENSE">MIT</a></p>
+</article> </section> </main> <footer> <div class="footer-container"> <p class="footer-copy">
+&copy; 2026 Animesh Singh
+</p> <ul class="footer-links"> <li><a href="mailto:animesh98388@gmail.com">Email</a></li> <li><a href="https://github.com/Blues1998" target="_blank" rel="noopener noreferrer">GitHub</a></li> <li><a href="https://www.linkedin.com/in/animesh-singh-profile/" target="_blank" rel="noopener noreferrer">LinkedIn</a></li> </ul> </div> </footer> <!-- Hidden terminal trigger --> <script>
+      document.addEventListener("keydown", function(e) {
+        if (e.key === "~" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          var tag = (e.target.tagName || "").toLowerCase();
+          if (tag !== "input" && tag !== "textarea" && !e.target.isContentEditable) {
+            window.location.href = "/terminal/";
+          }
+        }
+      });
+    </script> </body> </html>

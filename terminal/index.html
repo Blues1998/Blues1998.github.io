@@ -1,0 +1,196 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>~/terminal - Animesh Singh</title><meta name="robots" content="noindex"><style>:root{--color-bg: #fafaf9;--color-text: #1c1e21;--color-muted: #5f6368;--color-accent: #5563de;--color-border: rgba(28, 30, 33, .1);--font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;--font-heading: "Source Serif 4", Georgia, serif;--font-size-base: 18px;--line-height-base: 1.65;--font-size-sm: .9rem;--font-size-lg: 1.2rem;--font-size-xl: 1.6rem;--font-size-xxl: 2.2rem;--max-width: 70ch;--space-1: .5rem;--space-2: 1rem;--space-3: 1.5rem;--space-4: 2rem;--space-5: 3rem;--space-6: 4rem;--transition-fast: .15s ease;--transition-base: .25s ease;--radius-sm: 4px;--radius-md: 6px}*,*:before,*:after{box-sizing:border-box}html{font-size:var(--font-size-base)}body{margin:0;font-family:var(--font-body);line-height:var(--line-height-base);color:var(--color-text);background-color:var(--color-bg);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}:root.theme-transitioning,:root.theme-transitioning *,:root.theme-transitioning *:before,:root.theme-transitioning *:after{transition:background-color .55s ease,color .55s ease,border-color .55s ease,box-shadow .55s ease!important}@media(prefers-reduced-motion:reduce){:root.theme-transitioning,:root.theme-transitioning *,:root.theme-transitioning *:before,:root.theme-transitioning *:after{transition:none!important}}h1,h2,h3,h4{font-family:var(--font-heading);font-weight:500;line-height:1.25;margin-top:0}h1{font-size:var(--font-size-xxl);margin-bottom:var(--space-3)}h2{font-size:var(--font-size-xl);margin-bottom:var(--space-2)}h3{font-size:var(--font-size-lg);margin-bottom:var(--space-2)}p{margin-top:0;margin-bottom:var(--space-3)}small{font-size:var(--font-size-sm);color:var(--color-muted)}a{color:var(--color-accent);text-decoration:none}a:hover{text-decoration:underline}a:focus-visible{outline:2px solid var(--color-accent);outline-offset:3px}main{display:block;padding:var(--space-5) var(--space-3)}section{max-width:var(--max-width);margin-left:auto;margin-right:auto;margin-bottom:var(--space-6)}img,video{max-width:100%;height:auto;display:block}:focus-visible{outline:2px solid var(--color-accent);outline-offset:3px}
+.terminal-page{min-height:100vh;background:#0d1117;color:#c9d1d9;font-family:SF Mono,Fira Code,Cascadia Code,JetBrains Mono,Consolas,monospace;font-size:14px;line-height:1.7;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem}.terminal-page a.back-link{color:#484f58;font-size:.8rem;text-decoration:none;margin-bottom:1.5rem;transition:color .2s}.terminal-page a.back-link:hover{color:#c9d1d9}.terminal{background:#161b22;border:1px solid #30363d;border-radius:10px;width:100%;max-width:680px;overflow:hidden;box-shadow:0 16px 70px #00000080}.terminal-titlebar{background:#21262d;padding:.6rem 1rem;display:flex;align-items:center;gap:.5rem;border-bottom:1px solid #30363d}.terminal-dot{width:12px;height:12px;border-radius:50%}.terminal-dot.red{background:#ff5f57}.terminal-dot.yellow{background:#febc2e}.terminal-dot.green{background:#28c840}.terminal-title{flex:1;text-align:center;color:#484f58;font-size:.75rem}.terminal-body{padding:1.2rem 1.4rem;min-height:300px}.terminal-line{min-height:1.7em;margin-bottom:.15rem}.t-prompt{color:#3fb950}.t-command{color:#d2a8ff}.t-flag{color:#79c0ff}.t-path{color:#ffa657}.t-string{color:#a5d6ff}.t-output{color:#8b949e}.t-keyword{color:#ff7b72}.t-pipe{color:#c9d1d9}.t-url{color:#58a6ff;text-decoration:underline}.t-number{color:#79c0ff}.t-badge{font-weight:600}.t-badge.done{color:#3fb950}.t-badge.wip{color:#d29922}.t-comment{color:#484f58;font-style:italic}.t-cursor{display:inline-block;width:8px;height:1.15em;background:#c9d1d9;vertical-align:text-bottom;margin-left:1px;animation:cursor-blink 1s step-end infinite}@keyframes cursor-blink{0%,to{opacity:1}50%{opacity:0}}@media(max-width:640px){.terminal-page{font-size:12px;padding:1rem}.terminal-body{padding:.8rem 1rem}}
+</style></head> <body style="margin: 0;"> <div class="terminal-page"> <a href="/" class="back-link">← back to site</a> <div class="terminal"> <div class="terminal-titlebar"> <span class="terminal-dot red"></span> <span class="terminal-dot yellow"></span> <span class="terminal-dot green"></span> <span class="terminal-title">animesh - zsh - 80×24</span> </div> <div class="terminal-body" id="terminal-body"></div> </div> </div> <script>
+      (() => {
+        const body = document.getElementById("terminal-body");
+        const cursor = body.querySelector(".t-cursor");
+
+        const lines = [
+          {
+            delay: 600,
+            parts: [{ cls: "t-prompt", text: "$ " }, { cls: "t-command", text: "whoami" }],
+          },
+          {
+            delay: 100,
+            speed: 22,
+            parts: [{ cls: "t-output", text: "animesh - software engineer, photographer, musician" }],
+          },
+          { delay: 350, parts: [] },
+          {
+            delay: 200,
+            parts: [{ cls: "t-prompt", text: "$ " }, { cls: "t-command", text: "cat " }, { cls: "t-path", text: "about.txt" }],
+          },
+          {
+            delay: 100,
+            speed: 18,
+            parts: [{ cls: "t-output", text: "Building calm, reliable systems." }],
+          },
+          {
+            delay: 0,
+            speed: 18,
+            parts: [{ cls: "t-output", text: "Bias toward simplicity. Own systems end-to-end." }],
+          },
+          { delay: 350, parts: [] },
+          {
+            delay: 200,
+            parts: [{ cls: "t-prompt", text: "$ " }, { cls: "t-command", text: "ls " }, { cls: "t-flag", text: "-la " }, { cls: "t-path", text: "~/projects/" }],
+          },
+          {
+            delay: 100,
+            parts: [{ cls: "t-output", text: "total 4" }],
+          },
+          {
+            delay: 0,
+            parts: [
+              { cls: "t-output", text: "drwxr-xr-x  staxls/          " },
+              { cls: "t-badge done", text: "finished" },
+              { cls: "t-output", text: "   " },
+              { cls: "t-comment", text: "# Python, Robot Framework" },
+            ],
+          },
+          {
+            delay: 0,
+            parts: [
+              { cls: "t-output", text: "drwxr-xr-x  reqdiff/         " },
+              { cls: "t-badge done", text: "finished" },
+              { cls: "t-output", text: "   " },
+              { cls: "t-comment", text: "# Python, CLI, PyPI" },
+            ],
+          },
+          {
+            delay: 0,
+            parts: [
+              { cls: "t-output", text: "drwxr-xr-x  portfolio/       " },
+              { cls: "t-badge wip", text: "in-dev" },
+              { cls: "t-output", text: "      " },
+              { cls: "t-comment", text: "# Astro, React, TypeScript" },
+            ],
+          },
+          {
+            delay: 0,
+            parts: [
+              { cls: "t-output", text: "drwxr-xr-x  focus-reader/    " },
+              { cls: "t-badge wip", text: "in-dev" },
+              { cls: "t-output", text: "      " },
+              { cls: "t-comment", text: "# React, UX" },
+            ],
+          },
+          { delay: 350, parts: [] },
+          {
+            delay: 200,
+            parts: [{ cls: "t-prompt", text: "$ " }, { cls: "t-command", text: "echo " }, { cls: "t-string", text: "\"$CONTACT\"" }],
+          },
+          {
+            delay: 100,
+            parts: [{ cls: "t-output", text: "📧 " }, { cls: "t-output", text: "animesh98388@gmail.com" }],
+          },
+          {
+            delay: 0,
+            parts: [{ cls: "t-output", text: "🐙 " }, { cls: "t-url", text: "github.com/Blues1998" }],
+          },
+          {
+            delay: 0,
+            parts: [{ cls: "t-output", text: "💼 " }, { cls: "t-url", text: "linkedin.com/in/animesh-singh-profile" }],
+          },
+          { delay: 350, parts: [] },
+          {
+            delay: 400,
+            speed: 25,
+            parts: [{ cls: "t-comment", text: "# currently exploring: agentic AI" }],
+          },
+          {
+            delay: 200,
+            parts: [{ cls: "t-prompt", text: "$ " }, { cls: "t-cursor", text: "" }],
+          },
+        ];
+
+        let lineIndex = 0;
+
+        function typeLine() {
+          if (lineIndex >= lines.length) return;
+
+          const line = lines[lineIndex];
+          const speed = line.speed || 25;
+
+          setTimeout(() => {
+            // Remove all cursors from previous lines
+            body.querySelectorAll(".t-cursor").forEach(c => c.remove());
+
+            const lineEl = document.createElement("div");
+            lineEl.className = "terminal-line";
+            body.appendChild(lineEl);
+
+            if (line.parts.length === 0) {
+              // Empty spacer line
+              lineIndex++;
+              typeLine();
+              return;
+            }
+
+            // Flatten all parts into characters with their classes
+            const chars = [];
+            for (const part of line.parts) {
+              for (const ch of part.text) {
+                chars.push({ ch, cls: part.cls });
+              }
+            }
+
+            // Is this a static line (no typing animation)?
+            const isStatic = line.delay === 0 && line.speed === undefined;
+
+            if (isStatic) {
+              // Render all at once
+              for (const { ch, cls } of chars) {
+                if (cls === "t-cursor") {
+                  const c = document.createElement("span");
+                  c.className = "t-cursor";
+                  lineEl.appendChild(c);
+                } else {
+                  const span = document.createElement("span");
+                  span.className = cls;
+                  span.textContent = ch;
+                  lineEl.appendChild(span);
+                }
+              }
+              lineIndex++;
+              typeLine();
+            } else {
+              // Typewriter effect
+              let charIndex = 0;
+
+              function typeChar() {
+                if (charIndex >= chars.length) {
+                  // Add blinking cursor at end
+                  const c = document.createElement("span");
+                  c.className = "t-cursor";
+                  lineEl.appendChild(c);
+
+                  lineIndex++;
+                  typeLine();
+                  return;
+                }
+
+                const { ch, cls } = chars[charIndex];
+                if (cls === "t-cursor") {
+                  const c = document.createElement("span");
+                  c.className = "t-cursor";
+                  lineEl.appendChild(c);
+                } else {
+                  const span = document.createElement("span");
+                  span.className = cls;
+                  span.textContent = ch;
+                  lineEl.appendChild(span);
+                }
+
+                charIndex++;
+                setTimeout(typeChar, speed);
+              }
+
+              typeChar();
+            }
+          }, line.delay);
+        }
+
+        typeLine();
+      })();
+    </script> </body> </html>
