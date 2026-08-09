@@ -30,6 +30,7 @@ Not a company or product, a personal site distinguished by:
 - **Playground**: a separate layout (`PlaygroundLayout.astro`, `playground.css`) hosting interactive React/Three.js experiments (e.g. `endless-drive`), reached from a WebGL hero (egg-hatching animation) and a snaking gallery of experiment cards.
 - Hidden Easter egg: pressing `~` anywhere navigates to `/terminal`, a scripted fake-terminal animation (`noindex`).
 - Theme: light/dark toggle persisted to `localStorage`, applied pre-paint via an inline script to avoid FOUC.
+- **Homepage**: a boot-sequence intro (`IntroSequence.astro`, once per tab session, name decodes in via glitch effect, skippable, respects reduced motion) dissolves into a game-title-screen style menu (`HomeMenu.astro`): a quiet ambient canvas backdrop (drifting particles/glow, theme-aware, parallax on mouse move) behind a spare numbered list linking to Playground/Projects/Photography/Music/About/Contact. No hero paragraph, no Signals list, no project grid on the homepage, those live on their own pages; confirmed with the owner the old "Engineer. Photographer. Musician." styled homepage felt generic/try-hard.
 
 ## Capabilities and Constraints
 
@@ -40,7 +41,7 @@ Not a company or product, a personal site distinguished by:
 
 ## Brand Commitments
 
-- Name: Animesh Singh. Tagline: "Engineer. Photographer. Musician."
+- Name: Animesh Singh. No visible tagline on the homepage or intro, the name stands alone; where a description is needed (meta description, RSS), use a plain sentence, never a "Role. Role. Role." label list, confirmed with the owner as reading as generic/cringe.
 - Contact channels: email, GitHub (`github.com/Blues1998`), LinkedIn (`linkedin.com/in/animesh-singh-profile`).
 - Stated current focus (About page): "Currently exploring: Agentic AI."
 - Confirmed with the owner: **Playground is deliberately a separate visual world/brand** from the main site, its own tone, pacing, and visual language are intentional, not a gap to unify.
@@ -53,7 +54,7 @@ Not a company or product, a personal site distinguished by:
 
 ## Product Principles
 
-1. Craft and restraint over self-promotion, the main site (Header/Footer/BaseLayout) stays calm and editorial; expressive/experimental work is reserved for Playground.
+1. Craft and restraint over self-promotion, the main site (Header/Footer/BaseLayout) stays calm and editorial; expressive/experimental work is reserved for Playground. The homepage's ambient menu backdrop is a deliberate, scoped exception (ties into the boot-sequence intro), not a precedent for adding motion/flourish elsewhere on the main site.
 2. No funnel, no conversion pressure, never add growth-hacking CTAs or steer visitors toward a single path.
 3. Playground is its own room, it should feel like a different identity, not a diluted or unified extension of the main portfolio.
 4. Content authenticity, project descriptions come from live GitHub data; never hand-write or embellish project copy beyond what the repo states.

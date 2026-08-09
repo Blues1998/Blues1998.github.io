@@ -10,7 +10,8 @@ import "../styles/dark.css";
 
 const {
   title = "Animesh Singh",
-  description = "Engineer. Photographer. Musician.",
+  description = "Personal site of Animesh Singh, software engineer, photographer, and musician.",
+  hideChrome = false,
 } = Astro.props;
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
@@ -103,13 +104,13 @@ const socialImage = new URL("/images/og-default.png", Astro.site);
 
   <body>
 
-    <Header />
+    {!hideChrome && <Header />}
 
-    <main id="main">
+    <main id="main" class={hideChrome ? "main-bare" : undefined}>
       <slot />
     </main>
 
-    <Footer />
+    {!hideChrome && <Footer />}
 
     <!-- Hidden terminal trigger -->
     <script is:inline>

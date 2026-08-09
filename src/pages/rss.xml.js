@@ -6,7 +6,7 @@ export async function GET(context) {
 
   return rss({
     title: "Animesh Singh",
-    description: "Engineer. Photographer. Musician.",
+    description: "Personal site of Animesh Singh, software engineer, photographer, and musician.",
     site: context.site,
     items: repos.map((repo) => ({
       title: repo.name,
