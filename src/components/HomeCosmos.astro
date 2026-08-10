@@ -1,0 +1,705 @@
+---
+/* Site-wide persistent backdrop: a stylized cosmic vista, six objects
+   mapped 1:1 to the site's six sections (About=star, Projects=planetary
+   system, Playground=nebula, Music=pulsar, Photography=distant galaxy,
+   Contact=probe/signal). Mounted once in BaseLayout as the first child of
+   the body element with transition:persist, so the WebGL context and
+   camera state survive client-side navigation between pages rather than
+   being rebuilt from scratch on every route (this component's own inline
+   script genuinely only ever runs once per tab session because of that
+   persistence; there is no re-init guard needed the way there is for
+   non-persisted scripts elsewhere in the layout). Fixed + negative z-index: painting order puts
+   negative-z positioned descendants before a stacking context's own
+   non-positioned in-flow content, so this always sits behind Header/
+   main/Footer regardless of DOM order, without those needing z-index too.
+
+   Glow reuses HomeEmblem's proven technique: additive sprites carrying
+   their own alpha (a radial gradient baked into a canvas texture), not
+   EffectComposer bloom, since bloom's blurred halo doesn't reliably extend
+   into pixels that started fully transparent on an alpha:true canvas. */
+---
+
+<div class="home-cosmos" id="home-cosmos" aria-hidden="true" data-cosmos-mode="hero" transition:persist transition:name="cosmos-scene">
+  <canvas id="home-cosmos-canvas"></canvas>
+  <div class="cosmos-scrim"></div>
+  <div class="cosmos-flash" id="cosmos-flash"></div>
+</div>
+
+<style>
+  .home-cosmos {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    display: none;
+  }
+
+  @media (min-width: 900px) {
+    .home-cosmos {
+      display: block;
+    }
+  }
+
+  .home-cosmos canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* Backdrop scrim: on inner pages the cosmos is ambient dressing behind
+     real content, not the point of the page, so it needs to recede well
+     behind body text. Toggled by data-cosmos-mode, set in the script below
+     from the current route on every astro:page-load (never from a
+     template conditional on this element - see the transition:persist
+     note in the frontmatter comment above: this node is never re-rendered
+     by Astro after the first paint, only ever updated by client JS). */
+  .cosmos-scrim {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--color-bg) 55%, transparent);
+    opacity: 0;
+    transition: opacity 500ms ease;
+  }
+
+  .home-cosmos[data-cosmos-mode="backdrop"] .cosmos-scrim {
+    opacity: 1;
+  }
+
+  /* Click-warp flash: a plain DOM overlay rather than a WebGL effect, so it
+     reads correctly even mid-navigation while the new page is still being
+     swapped in. Ramped by JS, not a CSS animation, since its duration has
+     to be coordinated with the actual navigate() call. */
+  .cosmos-flash {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, white 80%, var(--color-accent) 20%);
+    opacity: 0;
+    pointer-events: none;
+  }
+</style>
+
+<script>
+  import * as THREE from "three";
+  import { navigate } from "astro:transitions/client";
+
+  const LOG = "[HomeCosmos]";
+
+  try {
+    const container = document.getElementById("home-cosmos");
+    const canvasEl = document.getElementById("home-cosmos-canvas") as HTMLCanvasElement | null;
+    const flashEl = document.getElementById("cosmos-flash");
+    if (!container || !canvasEl) {
+      throw new Error("Cosmos container or canvas not found.");
+    }
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: true });
+    renderer.setClearColor(0x000000, 0);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+    camera.position.set(0, 0, 13);
+    camera.lookAt(0, 0, 0);
+
+    function readVarColor(name: string, fallback: string): THREE.Color {
+      const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return new THREE.Color(raw || fallback);
+    }
+
+    // Derive palette siblings from the theme accent via hue rotation, rather
+    // than hardcoding extra colors, so the nebula/galaxy stay in sync with
+    // theme changes exactly like every other material here.
+    function hueShift(color: THREE.Color, deltaTurns: number, satMul = 1, lightAdd = 0): THREE.Color {
+      const hsl = { h: 0, s: 0, l: 0 };
+      color.getHSL(hsl);
+      const out = new THREE.Color();
+      out.setHSL(
+        (hsl.h + deltaTurns + 1) % 1,
+        THREE.MathUtils.clamp(hsl.s * satMul, 0, 1),
+        THREE.MathUtils.clamp(hsl.l + lightAdd, 0, 1),
+      );
+      return out;
+    }
+
+    function makeGlowTexture(): THREE.CanvasTexture {
+      const size = 128;
+      const c = document.createElement("canvas");
+      c.width = size;
+      c.height = size;
+      const ctx = c.getContext("2d")!;
+      const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+      gradient.addColorStop(0, "rgba(255,255,255,1)");
+      gradient.addColorStop(0.35, "rgba(255,255,255,0.45)");
+      gradient.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, size, size);
+      const tex = new THREE.CanvasTexture(c);
+      tex.needsUpdate = true;
+      return tex;
+    }
+    const glowTexture = makeGlowTexture();
+
+    const accentColor = readVarColor("--color-accent", "#7c8aff");
+    const mutedColor = readVarColor("--color-muted", "#8b8e96");
+
+    // Every live Color instance that should track the theme accent/muted
+    // tokens gets pushed here once, at creation time. The theme observer
+    // below just copies into whatever's in these arrays, so nothing new
+    // needs bespoke retint logic when a material is added above.
+    const accentTargets: THREE.Color[] = [];
+    const mutedTargets: THREE.Color[] = [];
+
+    function makeGlowSprite(scale: number, opacity: number, initialColor = accentColor, track: THREE.Color[] | null = accentTargets): THREE.Sprite {
+      const mat = new THREE.SpriteMaterial({
+        map: glowTexture,
+        color: initialColor,
+        transparent: true,
+        opacity,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(scale, scale, 1);
+      if (track) track.push(mat.color);
+      return sprite;
+    }
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(ambientLight);
+
+    // Anchor: repositioned on resize so the whole cosmos leans right of
+    // center (menu occupies the left column), the same screen-fraction
+    // trick HomeEmblem used for the atom, generalized to a wider system.
+    const anchor = new THREE.Group();
+    scene.add(anchor);
+
+    // Lights are children of the anchor, not the scene: the anchor's world
+    // offset can be large (the system leans well right of origin), so
+    // fixed-in-world-space lights would fall off to near-black on the far
+    // side of the system. Keeping them local means every object gets the
+    // same relative lighting regardless of where the anchor sits.
+    const keyLight = new THREE.PointLight(0xffffff, 45, 0, 2);
+    keyLight.position.set(4, 5, 8);
+    anchor.add(keyLight);
+    const rimLight = new THREE.PointLight(0xffffff, 16, 0, 2);
+    rimLight.position.set(-5, -3, -2);
+    anchor.add(rimLight);
+
+    type CosmosKey = "about" | "projects" | "playground" | "music" | "photography" | "contact";
+    const objects: Partial<Record<CosmosKey, THREE.Group>> = {};
+
+    // ---- About: the star ----
+    {
+      const group = new THREE.Group();
+      group.position.set(1.0, 0.4, 0.5);
+      anchor.add(group);
+
+      const starMat = new THREE.MeshStandardMaterial({
+        color: accentColor,
+        emissive: accentColor,
+        emissiveIntensity: 1.3,
+        roughness: 0.4,
+        metalness: 0,
+      });
+      const star = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5, 3), starMat);
+      accentTargets.push(starMat.color, starMat.emissive);
+      group.add(star);
+
+      const coronaInner = makeGlowSprite(1.6, 0.55);
+      const coronaOuter = makeGlowSprite(2.8, 0.28);
+      group.add(coronaInner, coronaOuter);
+
+      group.userData = { starMat, star, coronaInner, coronaOuter };
+      objects.about = group;
+    }
+
+    // ---- Projects: a small planetary system ----
+    {
+      const group = new THREE.Group();
+      group.position.set(3.6, 1.1, -1.0);
+      anchor.add(group);
+
+      const hubGlow = makeGlowSprite(0.4, 0.5, mutedColor, mutedTargets);
+      group.add(hubGlow);
+
+      const planetDefs = [
+        { radius: 0.55, size: 0.07, tiltXDeg: 62, speed: 0.02, color: accentColor, ring: false },
+        { radius: 0.95, size: 0.1, tiltXDeg: 70, speed: 0.013, color: mutedColor, ring: true },
+        { radius: 1.35, size: 0.06, tiltXDeg: 66, speed: 0.009, color: accentColor, ring: false },
+      ];
+      const planetPivots: THREE.Group[] = [];
+      planetDefs.forEach((def, i) => {
+        const pivot = new THREE.Group();
+        pivot.rotation.x = THREE.MathUtils.degToRad(def.tiltXDeg);
+        pivot.rotation.z = (i / planetDefs.length) * Math.PI * 2;
+        group.add(pivot);
+
+        const planetMat = new THREE.MeshStandardMaterial({
+          color: def.color,
+          emissive: def.color,
+          emissiveIntensity: 0.25,
+          roughness: 0.5,
+          metalness: 0.1,
+        });
+        const planet = new THREE.Mesh(new THREE.SphereGeometry(def.size, 14, 14), planetMat);
+        planet.position.x = def.radius;
+        pivot.add(planet);
+
+        const targets = def.color === mutedColor ? mutedTargets : accentTargets;
+        targets.push(planetMat.color, planetMat.emissive);
+
+        if (def.ring) {
+          const ringMat = new THREE.MeshBasicMaterial({ color: def.color, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+          const ring = new THREE.Mesh(new THREE.RingGeometry(def.size * 1.5, def.size * 2.1, 24), ringMat);
+          ring.position.x = def.radius;
+          ring.rotation.x = Math.PI / 2.3;
+          pivot.add(ring);
+          targets.push(ringMat.color);
+        }
+
+        const orbitLineMat = new THREE.MeshBasicMaterial({ color: def.color, transparent: true, opacity: 0.18 });
+        const orbitLine = new THREE.Mesh(new THREE.TorusGeometry(def.radius, 0.005, 6, 96), orbitLineMat);
+        pivot.add(orbitLine);
+        targets.push(orbitLineMat.color);
+
+        planetPivots.push(pivot);
+      });
+
+      group.userData = { planetPivots, planetDefs };
+      objects.projects = group;
+    }
+
+    // ---- Music: a pulsar, rotating beam + rhythmic flash ----
+    {
+      const group = new THREE.Group();
+      group.position.set(4.6, -1.6, 0.8);
+      anchor.add(group);
+
+      const coreMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: accentColor,
+        emissiveIntensity: 1.6,
+        roughness: 0.3,
+      });
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 16), coreMat);
+      accentTargets.push(coreMat.emissive);
+      group.add(core);
+
+      const coreGlow = makeGlowSprite(0.9, 0.7);
+      group.add(coreGlow);
+
+      const beamGroup = new THREE.Group();
+      group.add(beamGroup);
+      const beamMat = new THREE.MeshBasicMaterial({
+        color: accentColor,
+        transparent: true,
+        opacity: 0.35,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      accentTargets.push(beamMat.color);
+      [1, -1].forEach((dir) => {
+        const beam = new THREE.Mesh(new THREE.ConeGeometry(0.03, 2.6, 10, 1, true), beamMat);
+        beam.rotation.z = dir > 0 ? -Math.PI / 2 : Math.PI / 2;
+        beam.position.x = dir * 1.3;
+        beamGroup.add(beam);
+      });
+
+      group.userData = { coreGlow, coreMat, beamGroup };
+      objects.music = group;
+    }
+
+    // ---- Contact: a probe emitting expanding signal-ping rings ----
+    {
+      const group = new THREE.Group();
+      group.position.set(2.2, -2.0, 2.0);
+      anchor.add(group);
+
+      const bodyMat = new THREE.MeshStandardMaterial({
+        color: mutedColor,
+        emissive: accentColor,
+        emissiveIntensity: 0.35,
+        roughness: 0.4,
+        metalness: 0.3,
+      });
+      const body = new THREE.Mesh(new THREE.OctahedronGeometry(0.15, 0), bodyMat);
+      mutedTargets.push(bodyMat.color);
+      accentTargets.push(bodyMat.emissive);
+      group.add(body);
+
+      const PING_COUNT = 3;
+      const pingMat = new THREE.MeshBasicMaterial({
+        color: accentColor,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const pings: THREE.Mesh[] = [];
+      for (let i = 0; i < PING_COUNT; i++) {
+        const ringMat = pingMat.clone();
+        accentTargets.push(ringMat.color);
+        const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.0, 32), ringMat);
+        group.add(ring);
+        pings.push(ring);
+      }
+
+      group.userData = { body, pings, pingPeriod: 2.6 };
+      objects.contact = group;
+    }
+
+    // ---- Playground: a nebula ----
+    {
+      const group = new THREE.Group();
+      group.position.set(-3.2, -0.6, -2.5);
+      anchor.add(group);
+
+      const NEBULA_COUNT = 260;
+      const positions = new Float32Array(NEBULA_COUNT * 3);
+      const colors = new Float32Array(NEBULA_COUNT * 3);
+      for (let i = 0; i < NEBULA_COUNT; i++) {
+        // Rough ellipsoid via three summed randoms (cheap approximation of a
+        // center-weighted volume, no need for true gaussian sampling here).
+        const rx = (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
+        const ry = (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
+        const rz = (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
+        positions[i * 3] = rx * 1.5;
+        positions[i * 3 + 1] = ry * 1.0;
+        positions[i * 3 + 2] = rz * 1.1;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      const colorAttr = new THREE.BufferAttribute(colors, 3);
+      geo.setAttribute("color", colorAttr);
+
+      function paintNebulaColors() {
+        const huePalette = [hueShift(accentColor, 0), hueShift(accentColor, 0.14, 1.1, 0.05), hueShift(accentColor, -0.16, 0.9, -0.02)];
+        for (let i = 0; i < NEBULA_COUNT; i++) {
+          const c = huePalette[i % huePalette.length];
+          colorAttr.setXYZ(i, c.r, c.g, c.b);
+        }
+        colorAttr.needsUpdate = true;
+      }
+      paintNebulaColors();
+
+      const mat = new THREE.PointsMaterial({
+        size: 0.08,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        sizeAttenuation: true,
+      });
+      const points = new THREE.Points(geo, mat);
+      group.add(points);
+
+      // A few soft additive puffs beneath the point sprinkle give the cloud
+      // real volume, rather than reading as scattered dust. Not pushed into
+      // accentTargets/mutedTargets since they're hue-shifted siblings, not
+      // the accent/muted tokens themselves; paintNebulaColors repaints them.
+      const puff1 = makeGlowSprite(2.6, 0.16, hueShift(accentColor, 0.1, 1, 0.05), null);
+      const puff2 = makeGlowSprite(2.0, 0.14, hueShift(accentColor, -0.14, 1, 0), null);
+      puff2.position.set(0.5, -0.2, -0.3);
+      group.add(puff1, puff2);
+
+      const repaintPuffs = () => {
+        (puff1.material as THREE.SpriteMaterial).color.copy(hueShift(accentColor, 0.1, 1, 0.05));
+        (puff2.material as THREE.SpriteMaterial).color.copy(hueShift(accentColor, -0.14, 1, 0));
+      };
+
+      group.userData = { points, paintNebulaColors, repaintPuffs };
+      objects.playground = group;
+    }
+
+    // ---- Photography: a distant spiral galaxy ----
+    {
+      const group = new THREE.Group();
+      group.position.set(-0.8, 2.3, -6.0);
+      group.rotation.x = THREE.MathUtils.degToRad(58);
+      anchor.add(group);
+
+      const GALAXY_COUNT = 420;
+      const ARMS = 2;
+      const positions = new Float32Array(GALAXY_COUNT * 3);
+      const colors = new Float32Array(GALAXY_COUNT * 3);
+      const galaxyT = new Float32Array(GALAXY_COUNT);
+      for (let i = 0; i < GALAXY_COUNT; i++) {
+        const t = i / GALAXY_COUNT;
+        galaxyT[i] = t;
+        const armIndex = i % ARMS;
+        const radius = Math.pow(t, 0.6) * 1.6;
+        const angle = t * Math.PI * 5 + armIndex * ((Math.PI * 2) / ARMS) + (Math.random() - 0.5) * 0.3;
+        const jitter = (Math.random() - 0.5) * 0.12 * (1 - t * 0.5);
+        positions[i * 3] = Math.cos(angle) * radius + jitter;
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 0.05 * (1 - t);
+        positions[i * 3 + 2] = Math.sin(angle) * radius + jitter;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      const colorAttr = new THREE.BufferAttribute(colors, 3);
+      geo.setAttribute("color", colorAttr);
+
+      function paintGalaxyColors() {
+        const core = new THREE.Color(0xffffff);
+        const edge = hueShift(accentColor, 0.05, 1, -0.05);
+        for (let i = 0; i < GALAXY_COUNT; i++) {
+          const mixed = core.clone().lerp(edge, Math.min(1, galaxyT[i] * 1.2));
+          colorAttr.setXYZ(i, mixed.r, mixed.g, mixed.b);
+        }
+        colorAttr.needsUpdate = true;
+      }
+      paintGalaxyColors();
+
+      const mat = new THREE.PointsMaterial({
+        size: 0.05,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.85,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        sizeAttenuation: true,
+      });
+      const points = new THREE.Points(geo, mat);
+      group.add(points);
+
+      const coreGlow = makeGlowSprite(0.6, 0.5, new THREE.Color(0xffffff));
+      group.add(coreGlow);
+
+      group.userData = { points, paintGalaxyColors, coreGlow };
+      objects.photography = group;
+    }
+
+    function resize() {
+      const rect = container!.getBoundingClientRect();
+      const w = rect.width || 1;
+      const h = rect.height || 1;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+
+      const distance = camera.position.z;
+      const visibleHeight = 2 * distance * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+      const visibleWidth = visibleHeight * camera.aspect;
+      const screenFraction = w >= 1200 ? 0.6 : 0.55;
+      anchor.position.x = (screenFraction - 0.5) * visibleWidth;
+    }
+    resize();
+    window.addEventListener("resize", resize);
+
+    const themeObserver = new MutationObserver(() => {
+      const accent = readVarColor("--color-accent", "#7c8aff");
+      const muted = readVarColor("--color-muted", "#8b8e96");
+      accentColor.copy(accent);
+      mutedColor.copy(muted);
+      accentTargets.forEach((c) => c.copy(accent));
+      mutedTargets.forEach((c) => c.copy(muted));
+
+      objects.playground?.userData.paintNebulaColors();
+      objects.playground?.userData.repaintPuffs();
+      objects.photography?.userData.paintGalaxyColors();
+    });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+    let autoX = 0;
+    let autoY = 0;
+    let tiltX = 0;
+    let tiltY = 0;
+    let targetTiltX = 0;
+    let targetTiltY = 0;
+    let clock = 0;
+
+    // ---- Hover/focus choreography: HomeMenu dispatches cosmos:focus /
+    // cosmos:blur on document as the user hovers/keyboard-focuses a nav
+    // item. Rather than hand-tuned per-object camera presets, we aim the
+    // camera at whichever object's *live* world position (it keeps moving
+    // due to auto-rotation) and dolly in slightly, dimming the rest. ----
+    const ALL_KEYS = Object.keys(objects) as CosmosKey[];
+    let focusKey: CosmosKey | null = null;
+    const dimCurrent: Record<CosmosKey, number> = { about: 1, projects: 1, playground: 1, music: 1, photography: 1, contact: 1 };
+    const idleLookAt = new THREE.Vector3(0, 0, 0);
+    const currentLookAt = new THREE.Vector3(0, 0, 0);
+    const objectWorldPos = new THREE.Vector3();
+    const IDLE_CAMERA_Z = 13;
+    const FOCUS_CAMERA_Z = 9.5;
+    // Inner pages settle further out than either homepage state: the
+    // object there is ambient dressing behind real content, not a preview
+    // to linger on, so it should read small and quiet, not zoomed-in.
+    const BACKDROP_CAMERA_Z = 16.5;
+    let cameraZ = IDLE_CAMERA_Z;
+    let cosmosMode: "hero" | "backdrop" = "hero";
+    function desiredCameraZ(): number {
+      if (cosmosMode === "backdrop") return BACKDROP_CAMERA_Z;
+      return focusKey ? FOCUS_CAMERA_Z : IDLE_CAMERA_Z;
+    }
+
+    if (!reduceMotion) {
+      window.addEventListener("mousemove", (e) => {
+        const nx = e.clientX / window.innerWidth - 0.5;
+        const ny = e.clientY / window.innerHeight - 0.5;
+        targetTiltY = nx * 0.12;
+        targetTiltX = ny * 0.08;
+      });
+
+      document.addEventListener("cosmos:focus", ((e: CustomEvent<{ key: CosmosKey }>) => {
+        if (objects[e.detail.key]) focusKey = e.detail.key;
+      }) as EventListener);
+      document.addEventListener("cosmos:blur", () => {
+        focusKey = null;
+      });
+    }
+
+    // ---- Route-based arrival framing: which object (if any) a given page
+    // is "about". The homepage has no entry (idle wide shot); every inner
+    // page settles the camera on its section's object, same mechanism as
+    // hover-focus above, just sticky instead of cleared on mouseleave
+    // (inner pages have no HomeMenu to dispatch cosmos:blur). Reused rather
+    // than a separate code path, since "arriving settled on an object" and
+    // "hovering to preview an object" are visually the same shot. ----
+    function normalizedPath(): string {
+      const base = import.meta.env.BASE_URL || "/";
+      let path = location.pathname;
+      if (base !== "/" && path.startsWith(base)) path = "/" + path.slice(base.length);
+      return path;
+    }
+
+    function currentSectionKey(): CosmosKey | null {
+      const seg = normalizedPath().replace(/^\/+|\/+$/g, "").split("/")[0] as CosmosKey;
+      return objects[seg] ? seg : null;
+    }
+
+    // ---- Click-warp: HomeMenu preventDefaults the click and dispatches
+    // this instead, so we control exactly when navigation actually fires
+    // relative to the flash/punch-in, rather than racing a real link click
+    // against our own animation. Skipped entirely under reduced motion
+    // (HomeMenu never dispatches it in that case; plain links just work). ----
+    const WARP_FLASH_MS = 340;
+    const WARP_NAV_DELAY_MS = 420;
+    document.addEventListener("cosmos:warp", ((e: CustomEvent<{ key: CosmosKey; href: string }>) => {
+      const { key, href } = e.detail;
+      if (objects[key]) focusKey = key;
+      if (flashEl) {
+        flashEl.style.transition = `opacity ${WARP_FLASH_MS}ms ease-in`;
+        flashEl.style.opacity = "1";
+      }
+      window.setTimeout(() => navigate(href), WARP_NAV_DELAY_MS);
+    }) as EventListener);
+
+    function applyRouteFraming(instant: boolean) {
+      focusKey = currentSectionKey();
+      const path = normalizedPath().replace(/\/+$/, "");
+      cosmosMode = path === "" ? "hero" : "backdrop";
+      container!.dataset.cosmosMode = cosmosMode;
+      // A warp's flash is mid-fade-in when the new page's content swaps in;
+      // fade it back out now so it reads as "flash through", not a stuck
+      // white screen. Harmless no-op on a direct load/back-button arrival,
+      // since opacity is already 0 there.
+      if (flashEl) {
+        flashEl.style.transition = "opacity 550ms ease-out";
+        flashEl.style.opacity = "0";
+      }
+      if (!instant) return;
+      // Reduced motion never runs the animate() loop below, so the eased
+      // approach never happens on its own — snap directly to the settled
+      // shot and render exactly one frame, same policy as the idle scene.
+      ALL_KEYS.forEach((key) => {
+        dimCurrent[key] = focusKey === null ? 1 : key === focusKey ? 1 : 0.2;
+        objects[key]!.scale.setScalar(0.45 + 0.55 * dimCurrent[key]);
+      });
+      if (focusKey) {
+        objects[focusKey]!.getWorldPosition(objectWorldPos);
+        currentLookAt.copy(objectWorldPos);
+      } else {
+        currentLookAt.copy(idleLookAt);
+      }
+      cameraZ = desiredCameraZ();
+      camera.position.z = cameraZ;
+      camera.lookAt(currentLookAt);
+      renderer.render(scene, camera);
+    }
+    // Fires on the first load and on every subsequent client-side
+    // navigation alike once <ClientRouter /> is active in BaseLayout; a
+    // no-op before that lands, since nothing dispatches it yet.
+    document.addEventListener("astro:page-load", () => applyRouteFraming(reduceMotion));
+
+    function animate() {
+      clock += 0.016;
+      autoY += focusKey ? 0 : 0.0004;
+      tiltX += (targetTiltX - tiltX) * 0.05;
+      tiltY += (targetTiltY - tiltY) * 0.05;
+      anchor.rotation.set(autoX + tiltX, autoY + tiltY, 0);
+
+      ALL_KEYS.forEach((key) => {
+        const target = focusKey === null ? 1 : key === focusKey ? 1 : 0.2;
+        dimCurrent[key] += (target - dimCurrent[key]) * 0.08;
+        objects[key]!.scale.setScalar(0.45 + 0.55 * dimCurrent[key]);
+      });
+
+      if (focusKey) {
+        objects[focusKey]!.getWorldPosition(objectWorldPos);
+      }
+      const desiredLookAt = focusKey ? objectWorldPos : idleLookAt;
+      currentLookAt.lerp(desiredLookAt, 0.06);
+      cameraZ += (desiredCameraZ() - cameraZ) * 0.06;
+      camera.position.z = cameraZ;
+      camera.lookAt(currentLookAt);
+
+      const about = objects.about!.userData;
+      const starPulse = 1 + Math.sin(clock * 0.7) * 0.05;
+      about.star.scale.setScalar(starPulse);
+      about.coronaInner.material.opacity = (0.5 + Math.sin(clock * 0.9) * 0.1) * dimCurrent.about;
+      about.coronaOuter.material.opacity = (0.24 + Math.sin(clock * 0.6 + 1) * 0.06) * dimCurrent.about;
+      about.starMat.emissiveIntensity = 1.3 * (0.35 + 0.65 * dimCurrent.about);
+
+      const projects = objects.projects!.userData;
+      projects.planetPivots.forEach((pivot: THREE.Group, i: number) => {
+        pivot.rotation.z += projects.planetDefs[i].speed;
+      });
+
+      const music = objects.music!.userData;
+      music.beamGroup.rotation.y += 0.02;
+      // Sharp, spiky pulse rather than a smooth sine, so it reads as a
+      // rhythmic "beat" rather than a slow breathing glow.
+      const beat = Math.max(0, Math.sin(clock * 2.4));
+      const flash = Math.pow(beat, 10);
+      music.coreGlow.material.opacity = (0.4 + flash * 0.6) * dimCurrent.music;
+      music.coreMat.emissiveIntensity = (1.2 + flash * 1.8) * dimCurrent.music;
+
+      const contact = objects.contact!.userData;
+      contact.body.rotation.x += 0.006;
+      contact.body.rotation.y += 0.009;
+      contact.pings.forEach((ring: THREE.Mesh, i: number) => {
+        const phase = ((clock + (i * contact.pingPeriod) / contact.pings.length) % contact.pingPeriod) / contact.pingPeriod;
+        const scale = 0.15 + phase * 1.6;
+        ring.scale.setScalar(scale);
+        (ring.material as THREE.MeshBasicMaterial).opacity = (1 - phase) * 0.4 * dimCurrent.contact;
+      });
+
+      const playground = objects.playground!.userData;
+      playground.points.rotation.y += 0.0009;
+      playground.points.material.opacity = 0.8 * dimCurrent.playground;
+
+      const photography = objects.photography!.userData;
+      photography.points.rotation.z += 0.0006;
+      photography.points.material.opacity = 0.85 * dimCurrent.photography;
+      photography.coreGlow.material.opacity = 0.5 * dimCurrent.photography;
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    if (reduceMotion) {
+      renderer.render(scene, camera);
+    } else {
+      requestAnimationFrame(animate);
+    }
+  } catch (err) {
+    console.error(LOG, "Cosmos scene failed to initialize, leaving pane empty.", err);
+  }
+</script>

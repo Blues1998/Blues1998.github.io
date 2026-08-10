@@ -126,13 +126,23 @@ const letters = NAME.split("");
     var FAILSAFE_MS = 4500;
     var GLITCH_CHARS = "!<>-_/[]{}=+*^?#$%01";
 
-    try {
-      var root = document.getElementById("intro-sequence");
-      if (!root) {
-        console.error(LOG, "Root not found.");
-        return;
-      }
+    // With <ClientRouter /> active, navigating back to "/" can restore a
+    // cached snapshot of this page without re-running this script tag at
+    // all (observed: the intro's own top-level code never re-executes on
+    // that path, leaving a stale, never-checked #intro-sequence sitting at
+    // full opacity - a black-screen lockout). document itself is never
+    // replaced by any navigation, so a listener bound to it once, here,
+    // stays reliable regardless of how a given navigation restored the
+    // page. Guarded so forward navigations back to "/" (which DO re-run
+    // this script tag) don't stack a second listener.
+    if (window.__introSequenceBound) return;
+    window.__introSequenceBound = true;
 
+    function runIntro() {
+      var root = document.getElementById("intro-sequence");
+      if (!root) return; // Not on "/", or already removed - nothing to do.
+
+      try {
       var alreadySeen = false;
       try {
         alreadySeen = sessionStorage.getItem("introSeen") === "1";
@@ -145,6 +155,7 @@ const letters = NAME.split("");
       if (alreadySeen || reduceMotion) {
         console.debug(LOG, "Skipping intro.", { alreadySeen: alreadySeen, reduceMotion: reduceMotion });
         root.remove();
+        document.body.classList.remove("intro-active");
         return;
       }
 
@@ -285,11 +296,17 @@ const letters = NAME.split("");
         console.debug(LOG, "Key press, skipping.", { key: e.key });
         finish();
       });
-    } catch (err) {
-      console.error(LOG, "Intro sequence failed, removing to avoid blocking the page.", err);
-      var fallbackRoot = document.getElementById("intro-sequence");
-      if (fallbackRoot) fallbackRoot.remove();
-      document.body.classList.remove("intro-active");
+      } catch (err) {
+        console.error(LOG, "Intro sequence failed, removing to avoid blocking the page.", err);
+        var fallbackRoot = document.getElementById("intro-sequence");
+        if (fallbackRoot) fallbackRoot.remove();
+        document.body.classList.remove("intro-active");
+      }
     }
+
+    runIntro();
+    // Reliable across every navigation type (see the comment above), unlike
+    // this script tag's own top-level execution.
+    document.addEventListener("astro:page-load", runIntro);
   })();
 </script>

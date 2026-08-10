@@ -1,29 +1,32 @@
 ---
 /* Homepage as a game title screen: a quiet ambient backdrop spanning the
-   full viewport (no Header/Footer chrome, see BaseLayout's hideChrome),
-   a numbered menu pinned left like a AAA main menu, and an atom emblem
-   anchored to the right whose outer orbit is allowed to sweep left behind
-   the menu rather than being boxed into its own column. No hero copy, no
-   project grid, those live on their own pages, this is purely a way in. */
+   full viewport (no Header/Footer chrome, see BaseLayout's hideChrome) and
+   a numbered menu pinned left like a AAA main menu. No hero copy, no
+   project grid, those live on their own pages, this is purely a way in.
+   The cosmos scene itself is NOT mounted here: it's a persisted, site-wide
+   backdrop mounted once in BaseLayout (see HomeCosmos.astro) so it survives
+   navigation to the other five pages instead of being homepage-only. This
+   component only dispatches cosmos:focus/cosmos:blur events as the menu is
+   hovered/keyboard-focused; the scene listens on document regardless of
+   where it's mounted. Playground is excluded from that persistence
+   (data-astro-reload below): it runs its own separate, heavier Three.js
+   scenes and never shares a document with this one. */
 import ThemeToggle from "./ThemeToggle.astro";
-import HomeEmblem from "./HomeEmblem.astro";
 
 const base = import.meta.env.BASE_URL;
 
 const menuItems = [
-  { label: "Playground", href: `${base}playground/` },
-  { label: "Projects", href: `${base}projects/` },
-  { label: "Photography", href: `${base}photography/` },
-  { label: "Music", href: `${base}music/` },
-  { label: "About", href: `${base}about/` },
-  { label: "Contact", href: `${base}contact/` },
+  { label: "Playground", href: `${base}playground/`, cosmosKey: "playground", hardReload: true },
+  { label: "Projects", href: `${base}projects/`, cosmosKey: "projects" },
+  { label: "Photography", href: `${base}photography/`, cosmosKey: "photography" },
+  { label: "Music", href: `${base}music/`, cosmosKey: "music" },
+  { label: "About", href: `${base}about/`, cosmosKey: "about" },
+  { label: "Contact", href: `${base}contact/`, cosmosKey: "contact" },
 ];
 ---
 
 <div class="home-hero" id="home-hero">
   <canvas id="home-ambient" class="home-ambient" aria-hidden="true"></canvas>
-
-  <HomeEmblem />
 
   <div class="home-vignette" aria-hidden="true"></div>
 
@@ -39,7 +42,12 @@ const menuItems = [
         <ul>
           {menuItems.map((item, i) => (
             <li>
-              <a href={item.href} class="home-menu-item">
+              <a
+                href={item.href}
+                class="home-menu-item"
+                data-cosmos-key={item.cosmosKey}
+                data-astro-reload={item.hardReload ? true : undefined}
+              >
                 <span class="home-menu-index">{String(i + 1).padStart(2, "0")}</span>
                 <span class="home-menu-label">{item.label}</span>
                 <span class="home-menu-cursor" aria-hidden="true">&rsaquo;</span>
@@ -59,13 +67,14 @@ const menuItems = [
     min-height: 100vh;
     display: flex;
     align-items: center;
-    background: var(--color-bg);
+    /* No opaque fill here: the cosmos scene is a persisted, fixed backdrop
+       mounted in BaseLayout, behind this whole page. An opaque background
+       on this element would paint over it and hide it on the homepage. */
     background: radial-gradient(
-        ellipse at 30% 40%,
-        color-mix(in srgb, var(--color-accent) 8%, transparent) 0%,
-        transparent 60%
-      ),
-      var(--color-bg);
+      ellipse at 30% 40%,
+      color-mix(in srgb, var(--color-accent) 8%, transparent) 0%,
+      transparent 60%
+    );
   }
 
   .home-ambient {
@@ -198,11 +207,27 @@ const menuItems = [
 <script is:inline>
   (function () {
     var LOG = "[HomeMenu]";
+
+    // Not persisted (this markup only exists on "/"), and - critically -
+    // this script tag cannot be relied on to simply re-run on every
+    // navigation: a browser back-navigation to "/" can restore a cached
+    // snapshot of the page without re-executing this script at all (same
+    // root cause documented at length in IntroSequence.astro), which would
+    // otherwise leave this whole backdrop permanently frozen. So this runs
+    // from astro:page-load too, and tears down any previous instance
+    // first - covering both "never restarted" (the bug above) and
+    // "restarted while a real still-running instance exists" (a genuine
+    // fresh execution on top of a still-live previous one).
+    function initAmbient() {
+    if (window.__ambientCleanup) {
+      window.__ambientCleanup();
+      window.__ambientCleanup = null;
+    }
     try {
       var canvas = document.getElementById("home-ambient");
       var hero = document.getElementById("home-hero");
       if (!canvas || !hero) {
-        console.error(LOG, "Ambient canvas or hero root not found.");
+        // Expected on every route except "/" - not an error.
         return;
       }
 
@@ -290,13 +315,14 @@ const menuItems = [
       var offsetX = 0;
       var offsetY = 0;
 
+      function onMouseMove(e) {
+        var nx = e.clientX / window.innerWidth - 0.5;
+        var ny = e.clientY / window.innerHeight - 0.5;
+        targetOffsetX = nx * 10;
+        targetOffsetY = ny * 10;
+      }
       if (!reduceMotion) {
-        window.addEventListener("mousemove", function (e) {
-          var nx = e.clientX / window.innerWidth - 0.5;
-          var ny = e.clientY / window.innerHeight - 0.5;
-          targetOffsetX = nx * 10;
-          targetOffsetY = ny * 10;
-        });
+        window.addEventListener("mousemove", onMouseMove);
       }
 
       function draw() {
@@ -357,8 +383,83 @@ const menuItems = [
       } else {
         rafId = requestAnimationFrame(step);
       }
+
+      window.__ambientCleanup = function () {
+        if (rafId !== null) cancelAnimationFrame(rafId);
+        window.removeEventListener("resize", resize);
+        window.removeEventListener("mousemove", onMouseMove);
+        themeObserver.disconnect();
+      };
     } catch (err) {
       console.error(LOG, "Ambient backdrop failed to start.", err);
+    }
+    }
+
+    initAmbient();
+    if (!window.__ambientListenerBound) {
+      window.__ambientListenerBound = true;
+      document.addEventListener("astro:page-load", initAmbient);
+    }
+  })();
+</script>
+
+<script is:inline>
+  (function () {
+    var LOG = "[HomeMenu:cosmos]";
+
+    // Same astro:page-load caveat as the ambient backdrop above: this tag
+    // isn't guaranteed to re-run on every navigation (e.g. browser back to
+    // "/"), which would otherwise leave the menu's hover-to-focus and
+    // click-to-warp wiring permanently dead after using the back button.
+    // Each menu item is marked once it's wired (data-cosmos-wired) so
+    // re-running this is a no-op against nodes already wired, rather than
+    // stacking duplicate listeners on a genuinely fresh execution.
+    function wireMenu() {
+    try {
+      var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      // No hover-driven camera motion under reduced motion, matching the
+      // scene's own gate: nothing to wire up.
+      if (reduceMotion) return;
+
+      var items = document.querySelectorAll(".home-menu-item[data-cosmos-key]:not([data-cosmos-wired])");
+      items.forEach(function (item) {
+        item.setAttribute("data-cosmos-wired", "true");
+        var key = item.getAttribute("data-cosmos-key");
+        var focus = function () {
+          document.dispatchEvent(new CustomEvent("cosmos:focus", { detail: { key: key } }));
+        };
+        var blur = function () {
+          document.dispatchEvent(new CustomEvent("cosmos:blur"));
+        };
+        item.addEventListener("mouseenter", focus);
+        item.addEventListener("mouseleave", blur);
+        item.addEventListener("focus", focus);
+        item.addEventListener("blur", blur);
+
+        // Playground carries data-astro-reload (it runs its own separate
+        // Three.js scenes and always needs a real navigation) - leave its
+        // click alone entirely so the browser's default action fires,
+        // rather than intercepting into a warp this page can't finish.
+        if (item.hasAttribute("data-astro-reload")) return;
+
+        item.addEventListener("click", function (ev) {
+          // Let modified clicks (open in new tab, etc.) behave normally.
+          if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+          ev.preventDefault();
+          document.dispatchEvent(
+            new CustomEvent("cosmos:warp", { detail: { key: key, href: item.getAttribute("href") } })
+          );
+        });
+      });
+    } catch (err) {
+      console.error(LOG, "Failed to wire menu hover/focus events.", err);
+    }
+    }
+
+    wireMenu();
+    if (!window.__cosmosMenuListenerBound) {
+      window.__cosmosMenuListenerBound = true;
+      document.addEventListener("astro:page-load", wireMenu);
     }
   })();
 </script>

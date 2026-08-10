@@ -43,9 +43,16 @@
   (function() {
     var LOG = "[ThemeToggle]";
     var TRANSITION_MS = 550;
+
+    function bindToggle() {
     var btn = document.querySelector(".theme-toggle");
     if (!btn) {
-      console.error(LOG, "Toggle button not found.");
+      // Not an error here: some navigations (e.g. a cached back-navigation
+      // restoring the page, see IntroSequence.astro for the full story on
+      // why this script tag can't be relied on to simply re-run on its
+      // own) fire astro:page-load before this runs, and other routes may
+      // render no toggle at all momentarily. bindToggle() re-checks on
+      // every astro:page-load regardless.
       return;
     }
 
@@ -96,5 +103,12 @@
         console.error(LOG, "Failed to persist theme in localStorage.", err);
       }
     });
+    }
+
+    bindToggle();
+    if (!window.__themeToggleListenerBound) {
+      window.__themeToggleListenerBound = true;
+      document.addEventListener("astro:page-load", bindToggle);
+    }
   })();
 </script>

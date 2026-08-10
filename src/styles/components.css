@@ -162,6 +162,7 @@ footer {
 }
 
 .project-card {
+  background-color: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-3);
@@ -498,6 +499,7 @@ footer {
 }
 
 .music-item {
+  background-color: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-3);
