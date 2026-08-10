@@ -8,7 +8,6 @@ import HomeCosmos from "../components/HomeCosmos.astro";
 import "../styles/tokens.css";
 import "../styles/base.css";
 import "../styles/components.css";
-import "../styles/dark.css";
 
 const {
   title = "Animesh Singh",
@@ -25,46 +24,6 @@ const socialImage = new URL("/images/og-default.png", Astro.site);
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-    <!-- Theme init (must be first in head to prevent FOUC) -->
-    <script is:inline>
-      (function() {
-        var LOG = "[ThemeInit]";
-        try {
-          var t = localStorage.getItem("theme");
-          console.debug(LOG, "Init start.", { storedTheme: t });
-
-          if (t === "dark" || t === "light") {
-            document.documentElement.setAttribute("data-theme", t);
-            console.debug(LOG, "Applied stored theme.", { theme: t });
-          } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-            document.documentElement.setAttribute("data-theme", "dark");
-            console.debug(LOG, "Applied system dark theme.");
-          } else {
-            console.debug(LOG, "No stored or dark system theme, using light defaults.");
-          }
-
-          // Keep in sync if system theme changes while page is open (only when no manual override)
-          window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function(e) {
-            try {
-              console.debug(LOG, "System theme changed.", { matchesDark: e.matches });
-              if (!localStorage.getItem("theme")) {
-                document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
-                console.debug(LOG, "Applied system-driven theme change.", {
-                  theme: e.matches ? "dark" : "light",
-                });
-              } else {
-                console.debug(LOG, "Ignoring system change due to stored manual theme.");
-              }
-            } catch(err) {
-              console.error(LOG, "Failed handling system theme change.", err);
-            }
-          });
-        } catch(e) {
-          console.error(LOG, "Theme initialization failed.", e);
-        }
-      })();
-    </script>
 
     <!-- View Transitions: enables the persistent cosmos backdrop (see
          HomeCosmos.astro) to survive client-side navigation instead of
@@ -111,7 +70,7 @@ const socialImage = new URL("/images/og-default.png", Astro.site);
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
   </head>

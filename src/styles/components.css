@@ -604,17 +604,13 @@ footer {
 }
 
 .readme-content pre {
-  background: var(--color-bg-alt, #f5f5f5);
+  background: #161b22;
   border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 1rem 1.25rem;
   overflow-x: auto;
   margin-bottom: 1rem;
   font-size: 0.85rem;
-}
-
-[data-theme="dark"] .readme-content pre {
-  background: #161b22;
 }
 
 .readme-content code {
@@ -624,15 +620,10 @@ footer {
 
 .readme-content p code,
 .readme-content li code {
-  background: var(--color-bg-alt, #f5f5f5);
+  background: #161b22;
   border: 1px solid var(--color-border);
   border-radius: 3px;
   padding: 0.1em 0.35em;
-}
-
-[data-theme="dark"] .readme-content p code,
-[data-theme="dark"] .readme-content li code {
-  background: #161b22;
 }
 
 .readme-content blockquote {
@@ -662,10 +653,6 @@ footer {
 }
 
 .readme-content th {
-  background: var(--color-bg-alt, #f5f5f5);
-}
-
-[data-theme="dark"] .readme-content th {
   background: #161b22;
 }
 

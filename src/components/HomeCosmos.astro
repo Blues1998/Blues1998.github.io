@@ -31,13 +31,6 @@
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    display: none;
-  }
-
-  @media (min-width: 900px) {
-    .home-cosmos {
-      display: block;
-    }
   }
 
   .home-cosmos canvas {
@@ -81,6 +74,9 @@
 <script>
   import * as THREE from "three";
   import { navigate } from "astro:transitions/client";
+  import { detectDeviceTier, getStarfieldProfile } from "../lib/cosmos/deviceTier";
+  import { createStarfield } from "../lib/cosmos/starfield";
+  import { createCameraRig } from "../lib/cosmos/cameraRig";
 
   const LOG = "[HomeCosmos]";
 
@@ -93,10 +89,21 @@
     }
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const tier = detectDeviceTier();
+    const starfieldProfile = getStarfieldProfile(tier);
+    // The six narrative objects (star/planets/nebula/pulsar/galaxy/probe)
+    // stay part of the desktop menu experience for now, same as before
+    // this phase - not re-litigating that layout on mobile yet. The
+    // starfield foundation below is new and runs everywhere, tiered down.
+    // Read once at init rather than tracked live: this component only
+    // ever initializes once per tab (transition:persist), so a resize
+    // across the breakpoint mid-session won't retroactively add/remove
+    // the six-object scene - a known, acceptable limit for this phase.
+    const isDesktop = window.innerWidth >= 900;
 
     const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: true });
     renderer.setClearColor(0x000000, 0);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, starfieldProfile.pixelRatioCap));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.1;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -147,12 +154,21 @@
     const accentColor = readVarColor("--color-accent", "#7c8aff");
     const mutedColor = readVarColor("--color-muted", "#8b8e96");
 
-    // Every live Color instance that should track the theme accent/muted
-    // tokens gets pushed here once, at creation time. The theme observer
-    // below just copies into whatever's in these arrays, so nothing new
-    // needs bespoke retint logic when a material is added above.
+    // Dark is the site's only theme now, so these never get retinted live
+    // after construction - kept as plain Color instances (not baked
+    // constants) purely so every material below can share one read of the
+    // accent/muted tokens rather than re-parsing the CSS custom property
+    // per material.
     const accentTargets: THREE.Color[] = [];
     const mutedTargets: THREE.Color[] = [];
+
+    // Layered starfield: runs on every device (tiered down on mobile/low
+    // power via starfieldProfile), unlike the six-object scene below which
+    // stays desktop-only for this phase. Added directly to the scene, not
+    // the anchor, so it stays centered on the viewer regardless of where
+    // the anchor shifts for the six-object layout.
+    const starfield = createStarfield(starfieldProfile, accentColor, reduceMotion);
+    scene.add(starfield.group);
 
     function makeGlowSprite(scale: number, opacity: number, initialColor = accentColor, track: THREE.Color[] | null = accentTargets): THREE.Sprite {
       const mat = new THREE.SpriteMaterial({
@@ -169,14 +185,25 @@
       return sprite;
     }
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-    scene.add(ambientLight);
-
     // Anchor: repositioned on resize so the whole cosmos leans right of
     // center (menu occupies the left column), the same screen-fraction
     // trick HomeEmblem used for the atom, generalized to a wider system.
+    // Declared unconditionally (resize() always positions it) even though
+    // it stays empty on mobile - cheap, and avoids threading isDesktop
+    // through resize() for no real benefit.
     const anchor = new THREE.Group();
     scene.add(anchor);
+
+    type CosmosKey = "about" | "projects" | "playground" | "music" | "photography" | "contact";
+    const objects: Partial<Record<CosmosKey, THREE.Group>> = {};
+
+    // The six narrative objects are part of the desktop game-menu
+    // experience (see HomeMenu.astro) and stay desktop-only for this
+    // phase - foundation work here is the starfield above, not a mobile
+    // redesign of the menu scene.
+    if (isDesktop) {
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(ambientLight);
 
     // Lights are children of the anchor, not the scene: the anchor's world
     // offset can be large (the system leans well right of origin), so
@@ -189,9 +216,6 @@
     const rimLight = new THREE.PointLight(0xffffff, 16, 0, 2);
     rimLight.position.set(-5, -3, -2);
     anchor.add(rimLight);
-
-    type CosmosKey = "about" | "projects" | "playground" | "music" | "photography" | "contact";
-    const objects: Partial<Record<CosmosKey, THREE.Group>> = {};
 
     // ---- About: the star ----
     {
@@ -475,6 +499,7 @@
       group.userData = { points, paintGalaxyColors, coreGlow };
       objects.photography = group;
     }
+    } // end if (isDesktop)
 
     function resize() {
       const rect = container!.getBoundingClientRect();
@@ -493,19 +518,7 @@
     resize();
     window.addEventListener("resize", resize);
 
-    const themeObserver = new MutationObserver(() => {
-      const accent = readVarColor("--color-accent", "#7c8aff");
-      const muted = readVarColor("--color-muted", "#8b8e96");
-      accentColor.copy(accent);
-      mutedColor.copy(muted);
-      accentTargets.forEach((c) => c.copy(accent));
-      mutedTargets.forEach((c) => c.copy(muted));
-
-      objects.playground?.userData.paintNebulaColors();
-      objects.playground?.userData.repaintPuffs();
-      objects.photography?.userData.paintGalaxyColors();
-    });
-    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    starfield.setAccent(accentColor);
 
     let autoX = 0;
     let autoY = 0;
@@ -524,15 +537,14 @@
     let focusKey: CosmosKey | null = null;
     const dimCurrent: Record<CosmosKey, number> = { about: 1, projects: 1, playground: 1, music: 1, photography: 1, contact: 1 };
     const idleLookAt = new THREE.Vector3(0, 0, 0);
-    const currentLookAt = new THREE.Vector3(0, 0, 0);
     const objectWorldPos = new THREE.Vector3();
+    const cameraRig = createCameraRig(camera, 0.06);
     const IDLE_CAMERA_Z = 13;
     const FOCUS_CAMERA_Z = 9.5;
     // Inner pages settle further out than either homepage state: the
     // object there is ambient dressing behind real content, not a preview
     // to linger on, so it should read small and quiet, not zoomed-in.
     const BACKDROP_CAMERA_Z = 16.5;
-    let cameraZ = IDLE_CAMERA_Z;
     let cosmosMode: "hero" | "backdrop" = "hero";
     function desiredCameraZ(): number {
       if (cosmosMode === "backdrop") return BACKDROP_CAMERA_Z;
@@ -614,13 +626,9 @@
       });
       if (focusKey) {
         objects[focusKey]!.getWorldPosition(objectWorldPos);
-        currentLookAt.copy(objectWorldPos);
-      } else {
-        currentLookAt.copy(idleLookAt);
       }
-      cameraZ = desiredCameraZ();
-      camera.position.z = cameraZ;
-      camera.lookAt(currentLookAt);
+      cameraRig.setTarget(focusKey ? objectWorldPos : idleLookAt, desiredCameraZ());
+      cameraRig.snapToTarget();
       renderer.render(scene, camera);
     }
     // Fires on the first load and on every subsequent client-side
@@ -644,12 +652,12 @@
       if (focusKey) {
         objects[focusKey]!.getWorldPosition(objectWorldPos);
       }
-      const desiredLookAt = focusKey ? objectWorldPos : idleLookAt;
-      currentLookAt.lerp(desiredLookAt, 0.06);
-      cameraZ += (desiredCameraZ() - cameraZ) * 0.06;
-      camera.position.z = cameraZ;
-      camera.lookAt(currentLookAt);
+      cameraRig.setTarget(focusKey ? objectWorldPos : idleLookAt, desiredCameraZ());
+      cameraRig.update();
 
+      starfield.update(0.016, tiltX, tiltY);
+
+      if (isDesktop) {
       const about = objects.about!.userData;
       const starPulse = 1 + Math.sin(clock * 0.7) * 0.05;
       about.star.scale.setScalar(starPulse);
@@ -689,6 +697,7 @@
       photography.points.rotation.z += 0.0006;
       photography.points.material.opacity = 0.85 * dimCurrent.photography;
       photography.coreGlow.material.opacity = 0.5 * dimCurrent.photography;
+      } // end if (isDesktop)
 
       renderer.render(scene, camera);
       requestAnimationFrame(animate);

@@ -1,18 +1,16 @@
 ---
-/* Homepage as a game title screen: a quiet ambient backdrop spanning the
-   full viewport (no Header/Footer chrome, see BaseLayout's hideChrome) and
-   a numbered menu pinned left like a AAA main menu. No hero copy, no
-   project grid, those live on their own pages, this is purely a way in.
-   The cosmos scene itself is NOT mounted here: it's a persisted, site-wide
-   backdrop mounted once in BaseLayout (see HomeCosmos.astro) so it survives
-   navigation to the other five pages instead of being homepage-only. This
-   component only dispatches cosmos:focus/cosmos:blur events as the menu is
+/* Homepage as a game title screen: a numbered menu pinned left like a AAA
+   main menu, over the site-wide cosmos backdrop (no Header/Footer chrome,
+   see BaseLayout's hideChrome). No hero copy, no project grid, those live
+   on their own pages, this is purely a way in. The cosmos scene itself is
+   NOT mounted here: it's a persisted, site-wide backdrop mounted once in
+   BaseLayout (see HomeCosmos.astro) so it survives navigation to the other
+   five pages instead of being homepage-only. This component only
+   dispatches cosmos:focus/cosmos:blur events as the menu is
    hovered/keyboard-focused; the scene listens on document regardless of
    where it's mounted. Playground is excluded from that persistence
    (data-astro-reload below): it runs its own separate, heavier Three.js
    scenes and never shares a document with this one. */
-import ThemeToggle from "./ThemeToggle.astro";
-
 const base = import.meta.env.BASE_URL;
 
 const menuItems = [
@@ -26,13 +24,7 @@ const menuItems = [
 ---
 
 <div class="home-hero" id="home-hero">
-  <canvas id="home-ambient" class="home-ambient" aria-hidden="true"></canvas>
-
   <div class="home-vignette" aria-hidden="true"></div>
-
-  <div class="home-corner-toggle">
-    <ThemeToggle />
-  </div>
 
   <div class="home-hero-inner">
     <div class="home-hero-content">
@@ -77,15 +69,6 @@ const menuItems = [
     );
   }
 
-  .home-ambient {
-    position: absolute;
-    inset: -20px;
-    width: calc(100% + 40px);
-    height: calc(100% + 40px);
-    z-index: 0;
-    filter: blur(1.5px);
-  }
-
   .home-vignette {
     position: absolute;
     inset: 0;
@@ -96,13 +79,6 @@ const menuItems = [
       transparent 62%,
       color-mix(in srgb, var(--color-bg) 86%, black) 100%
     );
-  }
-
-  .home-corner-toggle {
-    position: absolute;
-    top: var(--space-3);
-    right: var(--space-3);
-    z-index: 4;
   }
 
   .home-hero-inner {
@@ -206,214 +182,15 @@ const menuItems = [
 
 <script is:inline>
   (function () {
-    var LOG = "[HomeMenu]";
-
-    // Not persisted (this markup only exists on "/"), and - critically -
-    // this script tag cannot be relied on to simply re-run on every
-    // navigation: a browser back-navigation to "/" can restore a cached
-    // snapshot of the page without re-executing this script at all (same
-    // root cause documented at length in IntroSequence.astro), which would
-    // otherwise leave this whole backdrop permanently frozen. So this runs
-    // from astro:page-load too, and tears down any previous instance
-    // first - covering both "never restarted" (the bug above) and
-    // "restarted while a real still-running instance exists" (a genuine
-    // fresh execution on top of a still-live previous one).
-    function initAmbient() {
-    if (window.__ambientCleanup) {
-      window.__ambientCleanup();
-      window.__ambientCleanup = null;
-    }
-    try {
-      var canvas = document.getElementById("home-ambient");
-      var hero = document.getElementById("home-hero");
-      if (!canvas || !hero) {
-        // Expected on every route except "/" - not an error.
-        return;
-      }
-
-      var ctx = canvas.getContext("2d");
-      if (!ctx) {
-        console.debug(LOG, "2D context unavailable, skipping ambient backdrop.");
-        return;
-      }
-
-      var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-      function hexToRgb(hex) {
-        var m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex.trim());
-        if (!m) return { r: 124, g: 138, b: 255 };
-        return {
-          r: parseInt(m[1], 16),
-          g: parseInt(m[2], 16),
-          b: parseInt(m[3], 16),
-        };
-      }
-
-      var accentRgb = { r: 124, g: 138, b: 255 };
-      function readAccent() {
-        try {
-          var raw = getComputedStyle(document.documentElement).getPropertyValue("--color-accent");
-          accentRgb = hexToRgb(raw || "#7c8aff");
-        } catch (err) {
-          console.debug(LOG, "Could not read accent color.", err);
-        }
-      }
-      readAccent();
-
-      var themeObserver = new MutationObserver(readAccent);
-      themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-
-      var dpr = Math.min(window.devicePixelRatio || 1, 2);
-      var width = 0;
-      var height = 0;
-
-      function resize() {
-        var rect = hero.getBoundingClientRect();
-        width = rect.width + 40;
-        height = rect.height + 40;
-        canvas.width = width * dpr;
-        canvas.height = height * dpr;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      }
-      resize();
-      window.addEventListener("resize", resize);
-
-      var PARTICLE_COUNT = 80;
-      var particles = [];
-      for (var i = 0; i < PARTICLE_COUNT; i++) {
-        var depth = 0.35 + Math.random() * 0.65;
-        particles.push({
-          x: Math.random() * width,
-          y: Math.random() * height,
-          r: (0.5 + Math.random() * 1.8) * depth,
-          vx: (Math.random() - 0.5) * 0.12 * depth,
-          vy: (Math.random() - 0.5) * 0.12 * depth,
-          depth: depth,
-          baseAlpha: 0.1 + Math.random() * 0.28,
-          twinklePhase: Math.random() * Math.PI * 2,
-          twinkleSpeed: 0.015 + Math.random() * 0.03,
-        });
-      }
-
-      var GLOW_COUNT = 4;
-      var glows = [];
-      for (var g = 0; g < GLOW_COUNT; g++) {
-        glows.push({
-          x: Math.random() * width,
-          y: Math.random() * height,
-          r: 150 + Math.random() * 160,
-          vx: (Math.random() - 0.5) * 0.05,
-          vy: (Math.random() - 0.5) * 0.05,
-          pulsePhase: Math.random() * Math.PI * 2,
-          pulseSpeed: 0.006 + Math.random() * 0.01,
-        });
-      }
-      var glowClock = 0;
-
-      var targetOffsetX = 0;
-      var targetOffsetY = 0;
-      var offsetX = 0;
-      var offsetY = 0;
-
-      function onMouseMove(e) {
-        var nx = e.clientX / window.innerWidth - 0.5;
-        var ny = e.clientY / window.innerHeight - 0.5;
-        targetOffsetX = nx * 10;
-        targetOffsetY = ny * 10;
-      }
-      if (!reduceMotion) {
-        window.addEventListener("mousemove", onMouseMove);
-      }
-
-      function draw() {
-        ctx.clearRect(0, 0, width, height);
-
-        glows.forEach(function (g) {
-          var pulse = reduceMotion ? 1 : 0.7 + Math.sin(glowClock * g.pulseSpeed + g.pulsePhase) * 0.3;
-          var gradient = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, g.r);
-          gradient.addColorStop(0, "rgba(" + accentRgb.r + "," + accentRgb.g + "," + accentRgb.b + "," + (0.06 * pulse).toFixed(3) + ")");
-          gradient.addColorStop(1, "rgba(" + accentRgb.r + "," + accentRgb.g + "," + accentRgb.b + ",0)");
-          ctx.fillStyle = gradient;
-          ctx.beginPath();
-          ctx.arc(g.x, g.y, g.r, 0, Math.PI * 2);
-          ctx.fill();
-        });
-
-        particles.forEach(function (p) {
-          var twinkle = reduceMotion ? 1 : 0.55 + Math.sin(glowClock * p.twinkleSpeed + p.twinklePhase) * 0.45;
-          var alpha = p.baseAlpha * twinkle;
-          ctx.beginPath();
-          ctx.fillStyle = "rgba(" + accentRgb.r + "," + accentRgb.g + "," + accentRgb.b + "," + alpha.toFixed(3) + ")";
-          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-          ctx.fill();
-        });
-      }
-
-      function step() {
-        glowClock += 1;
-
-        particles.forEach(function (p) {
-          p.x += p.vx;
-          p.y += p.vy;
-          if (p.x < -5) p.x = width + 5;
-          if (p.x > width + 5) p.x = -5;
-          if (p.y < -5) p.y = height + 5;
-          if (p.y > height + 5) p.y = -5;
-        });
-        glows.forEach(function (g) {
-          g.x += g.vx;
-          g.y += g.vy;
-          if (g.x < -g.r) g.x = width + g.r;
-          if (g.x > width + g.r) g.x = -g.r;
-          if (g.y < -g.r) g.y = height + g.r;
-          if (g.y > height + g.r) g.y = -g.r;
-        });
-
-        offsetX += (targetOffsetX - offsetX) * 0.05;
-        offsetY += (targetOffsetY - offsetY) * 0.05;
-        canvas.style.transform = "translate(" + offsetX.toFixed(2) + "px, " + offsetY.toFixed(2) + "px)";
-
-        draw();
-        rafId = requestAnimationFrame(step);
-      }
-
-      var rafId = null;
-      if (reduceMotion) {
-        draw();
-      } else {
-        rafId = requestAnimationFrame(step);
-      }
-
-      window.__ambientCleanup = function () {
-        if (rafId !== null) cancelAnimationFrame(rafId);
-        window.removeEventListener("resize", resize);
-        window.removeEventListener("mousemove", onMouseMove);
-        themeObserver.disconnect();
-      };
-    } catch (err) {
-      console.error(LOG, "Ambient backdrop failed to start.", err);
-    }
-    }
-
-    initAmbient();
-    if (!window.__ambientListenerBound) {
-      window.__ambientListenerBound = true;
-      document.addEventListener("astro:page-load", initAmbient);
-    }
-  })();
-</script>
-
-<script is:inline>
-  (function () {
     var LOG = "[HomeMenu:cosmos]";
 
-    // Same astro:page-load caveat as the ambient backdrop above: this tag
-    // isn't guaranteed to re-run on every navigation (e.g. browser back to
-    // "/"), which would otherwise leave the menu's hover-to-focus and
-    // click-to-warp wiring permanently dead after using the back button.
-    // Each menu item is marked once it's wired (data-cosmos-wired) so
-    // re-running this is a no-op against nodes already wired, rather than
-    // stacking duplicate listeners on a genuinely fresh execution.
+    // This tag isn't guaranteed to re-run on every navigation (e.g.
+    // browser back to "/"), which would otherwise leave the menu's
+    // hover-to-focus and click-to-warp wiring permanently dead after using
+    // the back button - so this also runs from astro:page-load. Each menu
+    // item is marked once it's wired (data-cosmos-wired) so re-running
+    // this is a no-op against nodes already wired, rather than stacking
+    // duplicate listeners on a genuinely fresh execution.
     function wireMenu() {
     try {
       var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;

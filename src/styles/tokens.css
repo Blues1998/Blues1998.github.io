@@ -1,14 +1,17 @@
 :root {
-  /* ---------- Colors ---------- */
-  --color-bg: #fafaf9;
-  --color-text: #1c1e21;
-  --color-muted: #5f6368;
-  --color-accent: #5563de;
-  --color-border: rgba(28, 30, 33, 0.1);
+  /* ---------- Colors ----------
+     Dark is the only theme now (the redesign is built around an
+     always-dark cinematic environment); these are the former dark.css
+     values, promoted to the base tokens rather than left as an override. */
+  --color-bg: #0f1117;
+  --color-text: #e2e4e9;
+  --color-muted: #8b8e96;
+  --color-accent: #7c8aff;
+  --color-border: rgba(255, 255, 255, 0.08);
 
   /* ---------- Typography ---------- */
   --font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-heading: "Source Serif 4", Georgia, serif;
+  --font-heading: "Space Grotesk", "Inter", system-ui, sans-serif;
 
   --font-size-base: 18px;
   --line-height-base: 1.65;
