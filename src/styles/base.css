@@ -100,3 +100,86 @@ video {
   outline: 2px solid var(--color-accent);
   outline-offset: 3px;
 }
+
+/* ---------- Page transit ----------
+   Navigating the site is a camera move, not a cut. HomeCosmos.astro dives
+   the camera toward the destination object, swaps the route while it's
+   right up against it, then eases back out to a resting shot - so there is
+   no moment that needs hiding and no white flash to hide it with. These
+   rules are the DOM half: the page's own content dissolves as the dive
+   starts and materializes again once you've arrived.
+
+   Driven by data-page-transit on #home-cosmos rather than on <html> or
+   <body> deliberately - that element carries transition:persist, so it
+   survives the swap untouched, while root and body attributes are both
+   replaced from the incoming document mid-navigation (which would drop the
+   state at exactly the wrong moment and flash the outgoing content back
+   in). The general sibling combinator works because the cosmos div is the
+   first child of <body>, ahead of header/main/footer. */
+main,
+body > nav,
+body > footer {
+  transition: opacity 380ms ease, transform 380ms ease;
+}
+
+#home-cosmos[data-page-transit] ~ main,
+#home-cosmos[data-page-transit] ~ nav,
+#home-cosmos[data-page-transit] ~ footer {
+  opacity: 0;
+}
+
+/* The small positional shift is scoped to inner pages (backdrop mode) on
+   purpose. The homepage's journey dots are position:fixed and live inside
+   <main>, and a transform on an ancestor would make <main> their containing
+   block - parking them somewhere down a 600vh scroll track for the length
+   of the fade. Inner pages have no fixed content inside main, so they get
+   the fuller effect: content recedes as you leave, rises into place as you
+   arrive. */
+#home-cosmos[data-cosmos-mode="backdrop"][data-page-transit="depart"] ~ main {
+  transform: translateY(-10px);
+}
+
+/* The arrival pose is *snapped* into place, not transitioned into. It only
+   exists for the frame between the route swap and the release below, so
+   letting it ease in would mean the transition barely leaves its starting
+   value before being told to go back - which is exactly what happens
+   without this: the content ends up sliding a fraction of a pixel instead
+   of the full 10. Removing the attribute restores the animated base rule,
+   and it's that release which plays. (Opacity gets away without this only
+   because it inherits a real 0 from the departure.) */
+#home-cosmos[data-page-transit="arrive"] ~ main,
+#home-cosmos[data-page-transit="arrive"] ~ nav,
+#home-cosmos[data-page-transit="arrive"] ~ footer {
+  transition: none;
+}
+
+#home-cosmos[data-cosmos-mode="backdrop"][data-page-transit="arrive"] ~ main {
+  transform: translateY(10px);
+}
+
+/* The cosmos canvas is persisted and rendering live right through the
+   route swap, so there is nothing for the View Transitions API to usefully
+   cross-fade there - it just paints a frozen snapshot of the previous
+   camera position over the real, moving one for the length of its default
+   animation, which shows up as a ghost of the object trailing behind
+   itself on arrival. Hand the live element straight over instead. (Scoped
+   to the cosmos-scene transition group, which is named on the element in
+   HomeCosmos.astro; the rest of the document keeps Astro's normal
+   crossfade.) */
+::view-transition-old(cosmos-scene) {
+  animation: none;
+  opacity: 0;
+}
+
+::view-transition-new(cosmos-scene) {
+  animation: none;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  main,
+  body > nav,
+  body > footer {
+    transition: none;
+  }
+}

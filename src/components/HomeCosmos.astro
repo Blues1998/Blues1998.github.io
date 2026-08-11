@@ -22,7 +22,6 @@
 <div class="home-cosmos" id="home-cosmos" aria-hidden="true" data-cosmos-mode="hero" transition:persist transition:name="cosmos-scene">
   <canvas id="home-cosmos-canvas"></canvas>
   <div class="cosmos-scrim"></div>
-  <div class="cosmos-flash" id="cosmos-flash"></div>
 </div>
 
 <style>
@@ -39,35 +38,47 @@
     display: block;
   }
 
-  /* Backdrop scrim: on inner pages the cosmos is ambient dressing behind
-     real content, not the point of the page, so it needs to recede well
-     behind body text. Toggled by data-cosmos-mode, set in the script below
-     from the current route on every astro:page-load (never from a
-     template conditional on this element - see the transition:persist
-     note in the frontmatter comment above: this node is never re-rendered
-     by Astro after the first paint, only ever updated by client JS). */
+  /* Backdrop scrim: on inner pages the cosmos still has to sit behind real
+     body text, but a flat wash across the whole viewport was what turned
+     the scene into wallpaper - it dimmed the section's own object just as
+     hard as the empty sky around it. This is a horizontal ramp instead:
+     dense across the left ~three-quarters, where the centered 70ch content
+     column actually lives, and thinning out toward the right margin, which
+     is exactly where the script below frames the section's object on inner
+     pages. Text keeps its contrast; the object you travelled to stays
+     genuinely present in the room beside it rather than being flattened
+     into a backdrop.
+
+     Toggled by data-cosmos-mode, set in the script below from the current
+     route on every astro:page-load (never from a template conditional on
+     this element - see the transition:persist note in the frontmatter
+     comment above: this node is never re-rendered by Astro after the first
+     paint, only ever updated by client JS). */
   .cosmos-scrim {
     position: absolute;
     inset: 0;
-    background: color-mix(in srgb, var(--color-bg) 55%, transparent);
+    background: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--color-bg) 72%, transparent) 0%,
+      color-mix(in srgb, var(--color-bg) 70%, transparent) 62%,
+      color-mix(in srgb, var(--color-bg) 40%, transparent) 82%,
+      color-mix(in srgb, var(--color-bg) 12%, transparent) 100%
+    );
     opacity: 0;
     transition: opacity 500ms ease;
   }
 
-  .home-cosmos[data-cosmos-mode="backdrop"] .cosmos-scrim {
-    opacity: 1;
+  /* Narrow viewports have no right margin to spare - the content column
+     runs edge to edge - so there the ramp would only be putting starfield
+     behind the last words of every line. Fall back to the flat wash. */
+  @media (max-width: 1099px) {
+    .cosmos-scrim {
+      background: color-mix(in srgb, var(--color-bg) 62%, transparent);
+    }
   }
 
-  /* Click-warp flash: a plain DOM overlay rather than a WebGL effect, so it
-     reads correctly even mid-navigation while the new page is still being
-     swapped in. Ramped by JS, not a CSS animation, since its duration has
-     to be coordinated with the actual navigate() call. */
-  .cosmos-flash {
-    position: absolute;
-    inset: 0;
-    background: color-mix(in srgb, white 80%, var(--color-accent) 20%);
-    opacity: 0;
-    pointer-events: none;
+  .home-cosmos[data-cosmos-mode="backdrop"] .cosmos-scrim {
+    opacity: 1;
   }
 </style>
 
@@ -85,7 +96,6 @@
   try {
     const container = document.getElementById("home-cosmos");
     const canvasEl = document.getElementById("home-cosmos-canvas") as HTMLCanvasElement | null;
-    const flashEl = document.getElementById("cosmos-flash");
     if (!container || !canvasEl) {
       throw new Error("Cosmos container or canvas not found.");
     }
@@ -760,22 +770,53 @@
       const max = DEPTH_ORDER.length - 1;
       return THREE.MathUtils.clamp(window.scrollY / vh, 0, max);
     }
-    // Inner pages settle further out than the homepage: the object there is
-    // ambient dressing behind real content, not a preview to linger on, so
-    // it should read small and quiet. Expressed as a multiple of the
-    // object's own standoff rather than a fixed z, since "far enough back"
-    // now means something different for a probe than for a galaxy.
-    const BACKDROP_STANDOFF_MULTIPLIER = 1.8;
+    // Inner pages settle a little further out than the homepage's own
+    // waypoint shot, but only a little: you flew here, and the object you
+    // flew to should still be in the room with you rather than retreating
+    // into wallpaper. (This was 1.8 - far enough that a probe or a pulsar
+    // shrank back to a speck the moment you arrived, which undercut the
+    // whole journey.) Expressed as a multiple of the object's own standoff
+    // rather than a fixed z, since "a bit further back" means something
+    // different for a probe than for a galaxy.
+    const BACKDROP_STANDOFF_MULTIPLIER = 1.15;
     let cosmosMode: "hero" | "backdrop" = "hero";
 
-    // How far off-centre to frame the focused object, so it clears the
-    // menu column on the left. Returned in world units at the given
-    // distance, which keeps the on-screen placement constant even as the
-    // standoff swings between 1 and 1050 units across the journey.
+    // ---- Warp dive (see the cosmos:warp handler below for the full
+    // rationale). Held here so computeCameraTarget can give it priority
+    // over every other framing source. ----
+    let warpKey: CosmosKey | null = null;
+    const WARP_DIVE_FACTOR = 0.34;
+    // Never dive closer than this. The camera's near plane sits at 0.5 and
+    // the smallest objects already park barely a unit out, so an unclamped
+    // fraction would push the destination *behind* the near plane and clip
+    // it out of existence at the exact moment it should be filling the
+    // frame.
+    const WARP_DIVE_MIN = 0.62;
+    function warpStandoff(key: CosmosKey): number {
+      return Math.max(OBJECT_LAYOUT[key].standoff * WARP_DIVE_FACTOR, WARP_DIVE_MIN);
+    }
+
+    // How far off-centre to frame the focused object. Returned in world
+    // units at the given distance, which keeps the on-screen placement
+    // constant even as the standoff swings between 1 and 1050 units across
+    // the journey.
+    //
+    // The homepage nudges it right of centre to clear the readout column on
+    // the left; inner pages push it further still, out into the right
+    // margin beside the centered 70ch content column - which is the same
+    // band the backdrop scrim deliberately leaves thin (see .cosmos-scrim).
+    // Below ~1100px there is no such margin, so it recentres and lets the
+    // flat scrim carry legibility instead.
     function framingOffsetX(distance: number): number {
       const visibleHeight = 2 * distance * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
       const visibleWidth = visibleHeight * camera.aspect;
-      const screenFraction = window.innerWidth >= 1200 ? 0.6 : 0.55;
+      const wide = window.innerWidth >= 1200;
+      let screenFraction: number;
+      if (cosmosMode === "backdrop") {
+        screenFraction = window.innerWidth >= 1100 ? (wide ? 0.84 : 0.78) : 0.5;
+      } else {
+        screenFraction = wide ? 0.6 : 0.55;
+      }
       return (screenFraction - 0.5) * visibleWidth;
     }
 
@@ -785,7 +826,13 @@
     // two can't drift apart.
     function computeCameraTarget(out: THREE.Vector3): number {
       let standoff: number;
-      if (journeyActive()) {
+      if (warpKey && objects[warpKey]) {
+        // Mid-navigation: overrides both the scroll journey and hover
+        // focus, so the dive can't be fought by whatever the page happens
+        // to be doing while it plays out.
+        objects[warpKey]!.getWorldPosition(objectWorldPos);
+        standoff = warpStandoff(warpKey);
+      } else if (journeyActive()) {
         const progress = journeyDepthProgress();
         const i0 = Math.floor(progress);
         const i1 = Math.min(i0 + 1, DEPTH_ORDER.length - 1);
@@ -859,21 +906,58 @@
       return objects[seg] ? seg : null;
     }
 
-    // ---- Click-warp: HomeMenu preventDefaults the click and dispatches
-    // this instead, so we control exactly when navigation actually fires
-    // relative to the flash/punch-in, rather than racing a real link click
-    // against our own animation. Skipped entirely under reduced motion
-    // (HomeMenu never dispatches it in that case; plain links just work). ----
-    const WARP_FLASH_MS = 340;
-    const WARP_NAV_DELAY_MS = 420;
-    document.addEventListener("cosmos:warp", ((e: CustomEvent<{ key: CosmosKey; href: string }>) => {
-      const { key, href } = e.detail;
-      if (objects[key]) focusKey = key;
-      if (flashEl) {
-        flashEl.style.transition = `opacity ${WARP_FLASH_MS}ms ease-in`;
-        flashEl.style.opacity = "1";
+    // ---- Click-warp: navigation as a continuous move through one world,
+    // not a cut between two pages. HomeMenu preventDefaults the click and
+    // dispatches this instead, so we control exactly when navigation fires
+    // relative to the camera rather than racing a real link click against
+    // our own animation. Skipped entirely under reduced motion (HomeMenu
+    // never dispatches it in that case; plain links just work).
+    //
+    // What happens, in order: the camera drops into a fast dive toward the
+    // clicked object while the page's own content dissolves (see the "Page
+    // transit" block in base.css); the route swaps while the camera is
+    // right up against it; then applyRouteFraming clears warpKey and hands
+    // back a normal resting standoff, so the rig eases back *out* of the
+    // dive with the destination page materializing around it.
+    //
+    // The white flash this replaced existed to hide the swap. Nothing needs
+    // hiding now - you never leave the scene, so there is no seam. ----
+    const WARP_NAV_DELAY_MS = 460;
+    // A tighter lerp than the idle 0.06: the dive has to substantially
+    // complete inside WARP_NAV_DELAY_MS, or the swap lands while the camera
+    // is still ambling and the arrival has no "burst out" to ease from.
+    const WARP_EASE = 0.13;
+    // Only the arrival half of the animation is conditional on having
+    // departed: a cold load or a back-button arrival should just be there,
+    // not fade itself in from nothing after the content has already painted.
+    let departed = false;
+
+    function setPageTransit(state: "depart" | "arrive" | null) {
+      if (reduceMotion) return;
+      if (state) container!.dataset.pageTransit = state;
+      else delete container!.dataset.pageTransit;
+    }
+
+    document.addEventListener("cosmos:warp", ((e: CustomEvent<{ key: CosmosKey; href: string; reload?: boolean }>) => {
+      // A dive is already in flight - a second click would queue a second
+      // navigation behind the first and land somewhere the visitor didn't
+      // ask for. Guarded on `departed` rather than `warpKey` so it also
+      // covers the tiers that have no objects to dive toward.
+      if (departed) return;
+      const { key, href, reload } = e.detail;
+      if (objects[key]) {
+        focusKey = key;
+        warpKey = key;
       }
-      window.setTimeout(() => navigate(href), WARP_NAV_DELAY_MS);
+      departed = true;
+      setPageTransit("depart");
+      window.setTimeout(() => {
+        // Playground runs its own Three.js scenes and needs a real document
+        // load; it still gets the dive, it just can't keep the WebGL context
+        // on the other side of it.
+        if (reload) window.location.href = href;
+        else navigate(href);
+      }, WARP_NAV_DELAY_MS);
     }) as EventListener);
 
     function applyRouteFraming(instant: boolean) {
@@ -881,13 +965,22 @@
       const path = normalizedPath().replace(/\/+$/, "");
       cosmosMode = path === "" ? "hero" : "backdrop";
       container!.dataset.cosmosMode = cosmosMode;
-      // A warp's flash is mid-fade-in when the new page's content swaps in;
-      // fade it back out now so it reads as "flash through", not a stuck
-      // white screen. Harmless no-op on a direct load/back-button arrival,
-      // since opacity is already 0 there.
-      if (flashEl) {
-        flashEl.style.transition = "opacity 550ms ease-out";
-        flashEl.style.opacity = "0";
+      // Releasing the dive here rather than on a timer is what makes the
+      // arrival read as one continuous move: the camera is deep inside the
+      // object's space at this instant, and simply handing the rig a normal
+      // resting standoff lets it ease back out under its own momentum.
+      warpKey = null;
+      if (departed) {
+        departed = false;
+        // The incoming content is still at the departed opacity (the state
+        // lives on this persisted element, so it survived the swap). Flip it
+        // to the arrival pose, then release it a frame later so the browser
+        // has a computed "from" value to transition out of - setting and
+        // clearing in the same frame would just be a no-op.
+        setPageTransit("arrive");
+        requestAnimationFrame(() => requestAnimationFrame(() => setPageTransit(null)));
+      } else {
+        setPageTransit(null);
       }
       if (!instant) return;
       // Reduced motion never runs the animate() loop below, so the eased
@@ -936,7 +1029,7 @@
 
       const standoff = computeCameraTarget(framedTarget);
       cameraRig.setTarget(framedTarget, standoff);
-      cameraRig.update();
+      cameraRig.update(warpKey ? WARP_EASE : undefined);
 
       // Stars are the one thing that should never fall behind: the camera
       // travels ~7800 units, far outside the fixed shells they're built on,

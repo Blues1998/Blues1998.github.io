@@ -378,16 +378,27 @@ const menuItems = [
             item.addEventListener("blur", blur);
           }
 
-          // Playground carries data-astro-reload (it runs its own separate
-          // Three.js scenes and always needs a real navigation) - leave its
-          // click alone so the browser's default action fires.
-          if (item.hasAttribute("data-astro-reload")) return;
+          // Reduced motion gets plain, immediate links: the warp is a
+          // camera move plus a content dissolve, neither of which happens
+          // there, so intercepting the click would only delay it.
+          if (reduceMotion) return;
 
           item.addEventListener("click", function (ev) {
             if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
             ev.preventDefault();
             document.dispatchEvent(
-              new CustomEvent("cosmos:warp", { detail: { key: key, href: item.getAttribute("href") } })
+              new CustomEvent("cosmos:warp", {
+                detail: {
+                  key: key,
+                  href: item.getAttribute("href"),
+                  // Playground runs its own separate Three.js scenes and
+                  // needs a real document load rather than a client-side
+                  // swap. It still gets the same departure - HomeCosmos
+                  // just finishes it with location.href instead of
+                  // navigate() (see the cosmos:warp handler there).
+                  reload: item.hasAttribute("data-astro-reload"),
+                },
+              })
             );
           });
         });
@@ -466,14 +477,20 @@ const menuItems = [
         });
 
         label.addEventListener("click", function (ev) {
-          // Currently pointing at Playground: let the real, full-reload
-          // navigation happen rather than intercepting it.
-          if (label.hasAttribute("data-astro-reload")) return;
+          if (reduceMotion) return;
           if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
           ev.preventDefault();
           document.dispatchEvent(
             new CustomEvent("cosmos:warp", {
-              detail: { key: label.getAttribute("data-cosmos-key"), href: label.getAttribute("href") },
+              detail: {
+                key: label.getAttribute("data-cosmos-key"),
+                href: label.getAttribute("href"),
+                // Set while the readout is pointing at Playground, which
+                // needs a real document load - it still dives in, it just
+                // can't carry the WebGL context across (see the cosmos:warp
+                // handler in HomeCosmos.astro).
+                reload: label.hasAttribute("data-astro-reload"),
+              },
             })
           );
         });
