@@ -1,0 +1,14 @@
+Sun / Mars / Saturn / Saturn ring / Neptune textures (sun-2k.jpg, mars-2k.jpg,
+saturn-2k.jpg, saturn-ring-2k.png, neptune-2k.jpg):
+  Source: Solar System Scope (https://www.solarsystemscope.com/textures/)
+  License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+  Attribution is displayed in the site footer.
+
+Nebula photography (nebula-1.jpg = "Pillars of Creation", nebula-2.jpg = "Mystic
+Mountain", both Hubble Space Telescope):
+  Source: NASA Image and Video Library (https://images.nasa.gov)
+    nebula-1.jpg: NASA ID GSFC_20171208_Archive_e000842
+    nebula-2.jpg: NASA ID PIA15985
+  License: NASA content is generally not copyrighted (public domain) unless
+  otherwise noted. See https://www.nasa.gov/nasa-brand-center/images-and-media/
+  Downsized from the original release resolution for use as a web sprite.

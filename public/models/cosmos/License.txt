@@ -1,0 +1,8 @@
+Itokawa asteroid 3D model (itokawa.glb):
+  Source: NASA Science (https://science.nasa.gov/resource/asteroid-itokawa-3d-model/)
+  Shape model derived from JAXA's Hayabusa mission observations of asteroid
+  25143 Itokawa; published by NASA Visualization Technology Applications and
+  Development (VTAD).
+  License: NASA content is generally not copyrighted (public domain) unless
+  otherwise noted. See https://www.nasa.gov/nasa-brand-center/images-and-media/
+  Credited (with JAXA) in the site footer.

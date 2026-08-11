@@ -73,6 +73,7 @@
 
 <script>
   import * as THREE from "three";
+  import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
   import { navigate } from "astro:transitions/client";
   import { detectDeviceTier, getStarfieldProfile } from "../lib/cosmos/deviceTier";
   import { createStarfield } from "../lib/cosmos/starfield";
@@ -151,6 +152,27 @@
     }
     const glowTexture = makeGlowTexture();
 
+    // Real astronomical materials: NASA/Solar-System-Scope sourced textures
+    // and a real scanned asteroid mesh (see public/textures/cosmos/License.txt
+    // and public/models/cosmos/License.txt for sourcing + license, and the
+    // credit line in Footer.astro). Loaded async and assigned directly as
+    // each material's map/scene - three.js updates the texture in place once
+    // decoded, so a slow or failed load just leaves today's flat/procedural
+    // look in place rather than blocking or breaking the scene.
+    const cosmosAssetBase = `${import.meta.env.BASE_URL}`.replace(/\/?$/, "/");
+    const textureLoader = new THREE.TextureLoader();
+    const gltfLoader = new GLTFLoader();
+    function loadCosmosTexture(file: string): THREE.Texture {
+      const tex = textureLoader.load(
+        `${cosmosAssetBase}textures/cosmos/${file}`,
+        undefined,
+        undefined,
+        (err: unknown) => console.error(LOG, `Failed to load texture ${file}`, err),
+      );
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
     const accentColor = readVarColor("--color-accent", "#7c8aff");
     const mutedColor = readVarColor("--color-muted", "#8b8e96");
 
@@ -224,14 +246,15 @@
       anchor.add(group);
 
       const starMat = new THREE.MeshStandardMaterial({
-        color: accentColor,
+        map: loadCosmosTexture("sun-2k.jpg"),
+        color: 0xffffff,
         emissive: accentColor,
-        emissiveIntensity: 1.3,
-        roughness: 0.4,
+        emissiveIntensity: 0.15,
+        roughness: 1,
         metalness: 0,
       });
       const star = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5, 3), starMat);
-      accentTargets.push(starMat.color, starMat.emissive);
+      accentTargets.push(starMat.emissive);
       group.add(star);
 
       const coronaInner = makeGlowSprite(1.6, 0.55);
@@ -251,11 +274,26 @@
       const hubGlow = makeGlowSprite(0.4, 0.5, mutedColor, mutedTargets);
       group.add(hubGlow);
 
-      const planetDefs = [
-        { radius: 0.55, size: 0.07, tiltXDeg: 62, speed: 0.02, color: accentColor, ring: false },
-        { radius: 0.95, size: 0.1, tiltXDeg: 70, speed: 0.013, color: mutedColor, ring: true },
-        { radius: 1.35, size: 0.06, tiltXDeg: 66, speed: 0.009, color: accentColor, ring: false },
+      const planetDefs: { radius: number; size: number; tiltXDeg: number; speed: number; color: THREE.Color; ring: boolean; texture: string; ringTexture?: string }[] = [
+        { radius: 0.55, size: 0.07, tiltXDeg: 62, speed: 0.02, color: accentColor, ring: false, texture: "mars-2k.jpg" },
+        { radius: 0.95, size: 0.1, tiltXDeg: 70, speed: 0.013, color: mutedColor, ring: true, texture: "saturn-2k.jpg", ringTexture: "saturn-ring-2k.png" },
+        { radius: 1.35, size: 0.06, tiltXDeg: 66, speed: 0.009, color: accentColor, ring: false, texture: "neptune-2k.jpg" },
       ];
+      // RingGeometry's default UVs run along vertex position, not polar
+      // radius, so a radial-gradient ring texture (like Saturn's, a thin
+      // strip encoding inner-to-outer banding) samples wrong out of the box.
+      // Remap so U tracks the 0..1 fraction from inner to outer radius.
+      function remapRingUVs(geometry: THREE.RingGeometry, innerRadius: number, outerRadius: number) {
+        const pos = geometry.attributes.position;
+        const uv = geometry.attributes.uv;
+        const v3 = new THREE.Vector3();
+        for (let i = 0; i < pos.count; i++) {
+          v3.fromBufferAttribute(pos, i);
+          const t = (v3.length() - innerRadius) / (outerRadius - innerRadius);
+          uv.setXY(i, t, 0.5);
+        }
+        uv.needsUpdate = true;
+      }
       const planetPivots: THREE.Group[] = [];
       planetDefs.forEach((def, i) => {
         const pivot = new THREE.Group();
@@ -264,9 +302,10 @@
         group.add(pivot);
 
         const planetMat = new THREE.MeshStandardMaterial({
-          color: def.color,
+          map: loadCosmosTexture(def.texture),
+          color: 0xffffff,
           emissive: def.color,
-          emissiveIntensity: 0.25,
+          emissiveIntensity: 0.1,
           roughness: 0.5,
           metalness: 0.1,
         });
@@ -275,15 +314,24 @@
         pivot.add(planet);
 
         const targets = def.color === mutedColor ? mutedTargets : accentTargets;
-        targets.push(planetMat.color, planetMat.emissive);
+        targets.push(planetMat.emissive);
 
         if (def.ring) {
-          const ringMat = new THREE.MeshBasicMaterial({ color: def.color, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
-          const ring = new THREE.Mesh(new THREE.RingGeometry(def.size * 1.5, def.size * 2.1, 24), ringMat);
+          const innerR = def.size * 1.5;
+          const outerR = def.size * 2.1;
+          const ringGeo = new THREE.RingGeometry(innerR, outerR, 48);
+          remapRingUVs(ringGeo, innerR, outerR);
+          const ringMat = new THREE.MeshBasicMaterial({
+            map: def.ringTexture ? loadCosmosTexture(def.ringTexture) : null,
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.9,
+            side: THREE.DoubleSide,
+          });
+          const ring = new THREE.Mesh(ringGeo, ringMat);
           ring.position.x = def.radius;
           ring.rotation.x = Math.PI / 2.3;
           pivot.add(ring);
-          targets.push(ringMat.color);
         }
 
         const orbitLineMat = new THREE.MeshBasicMaterial({ color: def.color, transparent: true, opacity: 0.18 });
@@ -294,7 +342,44 @@
         planetPivots.push(pivot);
       });
 
-      group.userData = { planetPivots, planetDefs };
+      // Asteroid: a genuinely irregular scanned shape (not a sphere
+      // pretending), orbiting closer in than the real planets. Tumbles on
+      // its own axes each frame rather than sharing the planets' fixed
+      // orbit-plane tilt - real asteroids have no settled "up".
+      const ASTEROID_RADIUS = 0.32;
+      const ASTEROID_SPEED = 0.028;
+      const asteroidPivot = new THREE.Group();
+      asteroidPivot.rotation.x = THREE.MathUtils.degToRad(58);
+      group.add(asteroidPivot);
+      gltfLoader.load(
+        `${cosmosAssetBase}models/cosmos/itokawa.glb`,
+        (gltf: any) => {
+          const mesh = gltf.scene;
+          const box = new THREE.Box3().setFromObject(mesh);
+          const size = box.getSize(new THREE.Vector3()).length();
+          mesh.scale.setScalar(0.11 / (size || 1));
+          mesh.position.x = ASTEROID_RADIUS;
+          // NASA's shape-model export carries a bare white/metallic PBR
+          // material with no environment map to reflect, so it renders
+          // near-black against the scene's point lights alone - overridden
+          // with a matte rock tint so the real scanned shape actually reads.
+          mesh.traverse((child: any) => {
+            if (child.isMesh) {
+              child.material = new THREE.MeshStandardMaterial({ color: 0x8a7c6e, roughness: 0.95, metalness: 0 });
+            }
+          });
+          asteroidPivot.add(mesh);
+          asteroidPivot.userData.mesh = mesh;
+        },
+        undefined,
+        (err: unknown) => console.error(LOG, "Failed to load asteroid model", err),
+      );
+      const asteroidOrbitMat = new THREE.MeshBasicMaterial({ color: mutedColor, transparent: true, opacity: 0.18 });
+      const asteroidOrbitLine = new THREE.Mesh(new THREE.TorusGeometry(ASTEROID_RADIUS, 0.005, 6, 96), asteroidOrbitMat);
+      asteroidPivot.add(asteroidOrbitLine);
+      mutedTargets.push(asteroidOrbitMat.color);
+
+      group.userData = { planetPivots, planetDefs, asteroidPivot, asteroidSpeed: ASTEROID_SPEED };
       objects.projects = group;
     }
 
@@ -425,11 +510,56 @@
       group.add(points);
 
       // A few soft additive puffs beneath the point sprinkle give the cloud
-      // real volume, rather than reading as scattered dust. Not pushed into
-      // accentTargets/mutedTargets since they're hue-shifted siblings, not
-      // the accent/muted tokens themselves; paintNebulaColors repaints them.
-      const puff1 = makeGlowSprite(2.6, 0.16, hueShift(accentColor, 0.1, 1, 0.05), null);
-      const puff2 = makeGlowSprite(2.0, 0.14, hueShift(accentColor, -0.14, 1, 0), null);
+      // real volume, rather than reading as scattered dust. Real Hubble
+      // photography (see public/textures/cosmos/License.txt), radially
+      // masked on load into the same soft-edged falloff makeGlowTexture
+      // uses, so it blends the same way while showing real nebula detail
+      // instead of a flat gradient. Falls back to the flat gradient - tinted
+      // per the hue-shifted accent, same as before - until the photo loads.
+      function makeNebulaSprite(scale: number, opacity: number, file: string, fallbackTint: THREE.Color): THREE.Sprite {
+        const mat = new THREE.SpriteMaterial({
+          map: glowTexture,
+          color: fallbackTint,
+          transparent: true,
+          opacity,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const sprite = new THREE.Sprite(mat);
+        sprite.scale.set(scale, scale, 1);
+
+        textureLoader.load(
+          `${cosmosAssetBase}textures/cosmos/${file}`,
+          (loaded: THREE.Texture) => {
+            const img = loaded.image as HTMLImageElement;
+            const size = 256;
+            const canvas = document.createElement("canvas");
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext("2d")!;
+            const srcSize = Math.min(img.width, img.height);
+            ctx.drawImage(img, (img.width - srcSize) / 2, (img.height - srcSize) / 2, srcSize, srcSize, 0, 0, size, size);
+            ctx.globalCompositeOperation = "destination-in";
+            const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+            gradient.addColorStop(0, "rgba(255,255,255,1)");
+            gradient.addColorStop(0.55, "rgba(255,255,255,0.7)");
+            gradient.addColorStop(1, "rgba(255,255,255,0)");
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            mat.map = tex;
+            mat.color.set(0xffffff);
+            mat.needsUpdate = true;
+          },
+          undefined,
+          (err: unknown) => console.error(LOG, `Failed to load nebula photo ${file}`, err),
+        );
+
+        return sprite;
+      }
+      const puff1 = makeNebulaSprite(2.6, 0.16, "nebula-1.jpg", hueShift(accentColor, 0.1, 1, 0.05));
+      const puff2 = makeNebulaSprite(2.0, 0.14, "nebula-2.jpg", hueShift(accentColor, -0.14, 1, 0));
       puff2.position.set(0.5, -0.2, -0.3);
       group.add(puff1, puff2);
 
@@ -663,12 +793,18 @@
       about.star.scale.setScalar(starPulse);
       about.coronaInner.material.opacity = (0.5 + Math.sin(clock * 0.9) * 0.1) * dimCurrent.about;
       about.coronaOuter.material.opacity = (0.24 + Math.sin(clock * 0.6 + 1) * 0.06) * dimCurrent.about;
-      about.starMat.emissiveIntensity = 1.3 * (0.35 + 0.65 * dimCurrent.about);
+      about.starMat.emissiveIntensity = 0.15 * (0.35 + 0.65 * dimCurrent.about);
 
       const projects = objects.projects!.userData;
       projects.planetPivots.forEach((pivot: THREE.Group, i: number) => {
         pivot.rotation.z += projects.planetDefs[i].speed;
       });
+      projects.asteroidPivot.rotation.z += projects.asteroidSpeed;
+      const asteroidMesh = projects.asteroidPivot.userData.mesh as THREE.Object3D | undefined;
+      if (asteroidMesh) {
+        asteroidMesh.rotation.x += 0.012;
+        asteroidMesh.rotation.y += 0.018;
+      }
 
       const music = objects.music!.userData;
       music.beamGroup.rotation.y += 0.02;
