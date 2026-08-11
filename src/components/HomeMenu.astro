@@ -145,10 +145,17 @@ const menuItems = [
   }
 
   /* ---- Journey mode: tall scroll track + sticky pinned panel ---- */
+  /* Six waypoints across five legs, with the sticky panel taking the first
+     100vh - so the scrollable range is 700vh and each leg is 140vh. That
+     length is deliberate: most of a leg is spent held on a waypoint rather
+     than travelling (see LEG_HOLD_START in HomeCosmos.astro), and a leg of
+     only 100vh left the dwell too short to actually look at anything.
+     HomeCosmos reads this element's real height rather than assuming a
+     figure, so this stays the single place the length is decided. */
   .home-journey {
     position: relative;
     z-index: 2;
-    height: calc(100vh * 6);
+    height: calc(100vh * 8);
   }
 
   .home-journey-sticky {
@@ -433,9 +440,22 @@ const menuItems = [
           return Math.max(0, Math.min(items.length - 1, i));
         }
 
-        function update() {
+        // One leg of the journey in pixels. Derived from the track's own
+        // height so it tracks the CSS above; HomeCosmos.astro computes the
+        // same figure the same way, which is what keeps the readout naming
+        // the object the camera is actually looking at.
+        function legLength() {
           var vh = window.innerHeight || 1;
-          var idx = clampIndex(Math.round(window.scrollY / vh));
+          var legs = items.length - 1;
+          return Math.max(1, (root.offsetHeight - vh) / legs);
+        }
+
+        function update() {
+          // Flip the readout at 0.6 of a leg rather than the midpoint:
+          // that's the middle of the camera's actual transit window (the
+          // 0.34-0.86 travel band in HomeCosmos.astro), so the name changes
+          // while you're between objects instead of while still parked.
+          var idx = clampIndex(Math.floor(window.scrollY / legLength() + 0.4));
           if (idx === lastIndex) return;
           lastIndex = idx;
 
@@ -471,8 +491,7 @@ const menuItems = [
 
         dots.forEach(function (dot, i) {
           dot.addEventListener("click", function () {
-            var vh = window.innerHeight || 1;
-            window.scrollTo({ top: i * vh, behavior: reduceMotion ? "auto" : "smooth" });
+            window.scrollTo({ top: i * legLength(), behavior: reduceMotion ? "auto" : "smooth" });
           });
         });
 

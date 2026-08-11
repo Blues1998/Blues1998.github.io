@@ -167,6 +167,28 @@
     }
     const glowTexture = makeGlowTexture();
 
+    // Additive blending that leaves the destination *alpha* alone.
+    //
+    // THREE.AdditiveBlending adds both colour and alpha. The renderer here
+    // is alpha:true (the page's own background gradients show through the
+    // canvas), so anything which raises alpha while contributing almost no
+    // colour makes those pixels composite *darker* than the page behind
+    // them. Bright sprites never revealed this; a large surface deliberately
+    // fading to black did - the pulsar's beams grew a dark ellipse at the
+    // exact end that was supposed to have faded out of existence.
+    //
+    // Spread as a spec object rather than a helper so it reads inline at
+    // each material that needs it.
+    const ADDITIVE_RGB_ONLY = {
+      blending: THREE.CustomBlending,
+      blendEquation: THREE.AddEquation,
+      blendSrc: THREE.SrcAlphaFactor,
+      blendDst: THREE.OneFactor,
+      blendEquationAlpha: THREE.AddEquation,
+      blendSrcAlpha: THREE.ZeroFactor,
+      blendDstAlpha: THREE.OneFactor,
+    } as const;
+
     // Real astronomical materials: NASA/Solar-System-Scope sourced textures
     // and a real scanned asteroid mesh (see public/textures/cosmos/License.txt
     // and public/models/cosmos/License.txt for sourcing + license, and the
@@ -244,32 +266,47 @@
     // That's why it read as a diagram of space rather than space: a galaxy,
     // a star and a hand-sized probe all had the same visual weight.
     //
-    // Now each object is built at its true relative extent and parked at
-    // its own depth. `scale` maps the group's locally-built size (all are
-    // roughly 1.5 units across as authored) onto that real extent, and
-    // `standoff` is how far the camera parks from it - kept proportional to
-    // the extent so everything still frames well despite spanning ~2000x in
-    // size. That proportionality is what does the real work: it means a
-    // probe fills the frame from a metre away while a galaxy fills it from
-    // a thousand units away, and everything *not* being visited is left at
-    // its true angular size, which is usually a speck or nothing at all.
+    // Now each object is built at its own extent and parked at its own
+    // depth, and everything *not* being visited is left at its true angular
+    // size from wherever you happen to be standing - which is usually a
+    // speck, or nothing at all. That's what makes the vista read as deep.
     //
-    // x/y are fractions of each object's own standoff, so the flight path
-    // weaves instead of running straight down the z axis (an object's own
-    // offset doesn't affect its framing - the camera centres on it either
-    // way - it only changes where its neighbours sit in frame).
-    const OBJECT_LAYOUT: Record<CosmosKey, { pos: [number, number, number]; scale: number; standoff: number }> = {
-      playground:  { pos: [52.5, 21, -400],     scale: 37.5,  standoff: 210 },   // nebula
-      projects:    { pos: [-9.6, 7.2, -1400],   scale: 8.3,   standoff: 48 },    // planetary system
-      photography: { pos: [157, -210, -4000],   scale: 187.5, standoff: 1050 },  // galaxy
-      music:       { pos: [-0.9, -0.3, -6000],  scale: 0.23,  standoff: 2.2 },   // pulsar
-      about:       { pos: [2.7, 3.4, -7000],    scale: 2.14,  standoff: 13.5 },  // star
-      contact:     { pos: [-0.16, 0.21, -8000], scale: 0.094, standoff: 1.05 },  // probe
+    // `scale` maps the group's locally-authored size (all are roughly 1.5
+    // units across as built) onto that extent. It is *not* a physically
+    // honest ratio and can't be: Voyager to the Milky Way is a factor of
+    // 10^20, which no renderer represents. What it preserves is the
+    // ordering and a sense of enormous range (~170x here) while keeping
+    // every object far enough from the near plane to actually draw.
+    //
+    // `frame` is the fraction of the viewport each object should occupy
+    // once you arrive - the camera's parking distance is derived from it
+    // and the object's *measured* extent (see measureExtents below) rather
+    // than hand-tuned. Hand-tuning was the bug: it silently drifted out of
+    // agreement with the geometry, leaving the pulsar at 10% of frame
+    // height and the probe at 3% - which is to say, invisible.
+    //
+    // `offset` is an x/y nudge in multiples of that same parking distance,
+    // so the flight path weaves instead of running straight down the z
+    // axis. An object's own offset doesn't change its framing (the camera
+    // centres on it either way); it only moves where its neighbours sit.
+    const OBJECT_LAYOUT: Record<
+      CosmosKey,
+      { z: number; offset: [number, number]; scale: number; frame: number }
+    > = {
+      playground:  { z: -400,  offset: [0.25, 0.10],   scale: 37.5,  frame: 0.92 }, // nebula
+      projects:    { z: -1400, offset: [-0.20, 0.15],  scale: 8.3,   frame: 0.74 }, // planetary system
+      photography: { z: -4000, offset: [0.15, -0.20],  scale: 187.5, frame: 0.88 }, // galaxy
+      music:       { z: -6000, offset: [-0.40, -0.14], scale: 2.6,   frame: 0.80 }, // pulsar
+      about:       { z: -7000, offset: [0.20, 0.25],   scale: 2.14,  frame: 0.86 }, // star
+      contact:     { z: -8000, offset: [-0.17, 0.22],  scale: 1.1,   frame: 0.72 }, // probe
     };
 
+    // Built at the origin's x/y and moved into place by placeObjects() once
+    // every object has been measured - position doesn't affect an object's
+    // own framing, so it can wait until the parking distances are known.
     function placeObject(group: THREE.Group, key: CosmosKey) {
       const layout = OBJECT_LAYOUT[key];
-      group.position.set(layout.pos[0], layout.pos[1], layout.pos[2]);
+      group.position.set(0, 0, layout.z);
       group.scale.setScalar(layout.scale);
     }
 
@@ -308,17 +345,19 @@
       // as well as diffuse - it reads correctly no matter where the scene
       // lights point, and can't go dark now that it sits 7000 units from
       // the lighting rig's nominal origin.
+      // Unlit on purpose. A star is its own light source - it has no
+      // terminator and no shaded side, so every one of MeshStandardMaterial's
+      // per-fragment lighting terms was being evaluated to produce something
+      // indistinguishable from the texture itself. That was invisible when
+      // the Sun was a small ball; now that it fills a third of the screen
+      // it was the single most expensive surface in the scene. Brightness
+      // rides on `color` instead of emissiveIntensity.
       const sunTexture = loadCosmosTexture("sun-2k.jpg");
-      const starMat = new THREE.MeshStandardMaterial({
-        map: sunTexture,
-        emissiveMap: sunTexture,
-        color: 0xffffff,
-        emissive: 0xffffff,
-        emissiveIntensity: 0.9,
-        roughness: 1,
-        metalness: 0,
-      });
-      const star = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5, 3), starMat);
+      const starMat = new THREE.MeshBasicMaterial({ map: sunTexture, color: 0xffffff });
+      // A real sphere rather than a subdivided icosahedron: at this framing
+      // the star fills a third of the screen and the icosahedron's facets
+      // showed on the limb as a visibly polygonal edge.
+      const star = new THREE.Mesh(new THREE.SphereGeometry(0.5, 64, 48), starMat);
       group.add(star);
 
       const coronaInner = makeGlowSprite(1.6, 0.55);
@@ -335,8 +374,17 @@
       placeObject(group, "projects");
       anchor.add(group);
 
-      const hubGlow = makeGlowSprite(0.4, 0.5, mutedColor, mutedTargets);
-      group.add(hubGlow);
+      // The system's own star. Warm and small rather than the muted grey
+      // smudge this was - a planetary system whose centre is a grey haze
+      // reads as an unfinished diagram, and the planets are lit from
+      // somewhere, so something should be there emitting.
+      const hubStar = new THREE.Mesh(
+        new THREE.SphereGeometry(0.075, 32, 24),
+        new THREE.MeshBasicMaterial({ color: 0xfff4e0 }),
+      );
+      const hubGlow = makeGlowSprite(0.42, 0.75, new THREE.Color(0xffe7bd), null);
+      const hubHalo = makeGlowSprite(0.95, 0.3, new THREE.Color(0xffd9a0), null);
+      group.add(hubStar, hubGlow, hubHalo);
 
       const planetDefs: { radius: number; size: number; tiltXDeg: number; speed: number; color: THREE.Color; ring: boolean; texture: string; ringTexture?: string }[] = [
         { radius: 0.55, size: 0.07, tiltXDeg: 62, speed: 0.02, color: accentColor, ring: false, texture: "mars-2k.jpg" },
@@ -453,37 +501,132 @@
       placeObject(group, "music");
       anchor.add(group);
 
+      // What's drawn here is the pulsar's *emission*, not its surface. A
+      // neutron star is about 20km across - at anything like a truthful
+      // size against the rest of this scene it is a sub-pixel dot, which is
+      // exactly what it used to be: 10% of the frame was the glow sprite
+      // and the star itself was 3%, so Music appeared to have no object at
+      // all. The beams and magnetosphere genuinely do span an enormous
+      // volume, so those carry the object and the core is left as the
+      // pinprick it should be.
       const coreMat = new THREE.MeshStandardMaterial({
         color: 0xffffff,
         emissive: accentColor,
         emissiveIntensity: 1.6,
         roughness: 0.3,
       });
-      const core = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 16), coreMat);
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.1, 16, 16), coreMat);
       accentTargets.push(coreMat.emissive);
       group.add(core);
 
-      const coreGlow = makeGlowSprite(0.9, 0.7);
-      group.add(coreGlow);
+      const coreGlow = makeGlowSprite(1.1, 0.85);
+      const haloGlow = makeGlowSprite(2.6, 0.3);
+      group.add(coreGlow, haloGlow);
+
+      // The magnetosphere: a bright, tightly-wound equatorial disc. Gives
+      // the beams something to be perpendicular to, so the object reads as
+      // having an axis rather than being a dot with two spikes.
+      const discMat = new THREE.MeshBasicMaterial({
+        color: accentColor,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.22,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        ...ADDITIVE_RGB_ONLY,
+      });
+      accentTargets.push(discMat.color);
+      const DISC_INNER = 0.22;
+      const DISC_OUTER = 1.25;
+      const discGeo = new THREE.RingGeometry(DISC_INNER, DISC_OUTER, 96, 8);
+      {
+        // Same fade-to-black-instead-of-an-edge treatment as the beams: a
+        // ring drawn at flat opacity ends in a hard circular cut, which is
+        // the one thing a cloud of infalling plasma definitely does not do.
+        const pos = discGeo.attributes.position;
+        const cols = new Float32Array(pos.count * 3);
+        const v = new THREE.Vector3();
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i);
+          // Clamped for the same reason as the beam ramp above - the outer
+          // rim measures a shade past DISC_OUTER, which sent 1 - t negative
+          // and turned the entire colour buffer into NaN.
+          const t = THREE.MathUtils.clamp((v.length() - DISC_INNER) / (DISC_OUTER - DISC_INNER), 0, 1);
+          const b = Math.pow(1 - t, 1.9);
+          cols[i * 3] = b;
+          cols[i * 3 + 1] = b;
+          cols[i * 3 + 2] = b;
+        }
+        discGeo.setAttribute("color", new THREE.BufferAttribute(cols, 3));
+      }
+      const disc = new THREE.Mesh(discGeo, discMat);
+      disc.rotation.x = Math.PI / 2;
+      group.add(disc);
 
       const beamGroup = new THREE.Group();
+      // Tilted off the rotation axis, which is what makes a pulsar a
+      // pulsar: the beams sweep a cone as the star turns, rather than
+      // sitting still and spinning about their own length (invisible).
+      beamGroup.rotation.z = 0.42;
       group.add(beamGroup);
+
+      // A beam is light, and light doesn't have a silhouette or an end. A
+      // plain additive cone has both: it reads as a solid grey megaphone,
+      // and because it's open-ended and double-sided you see straight into
+      // its far opening as a dark ellipse "cap". Fixed by baking a
+      // brightness ramp into vertex colours - additive blending makes black
+      // contribute exactly nothing, so a cone fading to black at its far
+      // end simply stops existing there, no alpha or shader needed.
+      const BEAM_LENGTH = 3.6;
+      function makeBeamGeometry(radius: number, height: number): THREE.ConeGeometry {
+        // Needs real height segments: the ramp is per-vertex, so a
+        // single-segment cone could only fade between its two ends.
+        const geo = new THREE.ConeGeometry(radius, height, 28, 16, true);
+        const pos = geo.attributes.position;
+        const colors = new Float32Array(pos.count * 3);
+        for (let i = 0; i < pos.count; i++) {
+          // 1 at the apex, which sits against the star; 0 at the open end.
+          // Clamped before the pow: the generated vertices land a hair
+          // outside [0, height] in float, and Math.pow() of a negative base
+          // with a fractional exponent is NaN - which propagates into the
+          // colour buffer and renders as garbage rather than as nothing.
+          const t = THREE.MathUtils.clamp((pos.getY(i) + height / 2) / height, 0, 1);
+          const v = Math.pow(t, 2.4);
+          colors[i * 3] = v;
+          colors[i * 3 + 1] = v;
+          colors[i * 3 + 2] = v;
+        }
+        geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+        return geo;
+      }
       const beamMat = new THREE.MeshBasicMaterial({
         color: accentColor,
+        vertexColors: true,
         transparent: true,
-        opacity: 0.35,
-        blending: THREE.AdditiveBlending,
+        opacity: 0.55,
+        side: THREE.DoubleSide,
         depthWrite: false,
+        ...ADDITIVE_RGB_ONLY,
       });
       accentTargets.push(beamMat.color);
+      const beamGeo = makeBeamGeometry(0.26, BEAM_LENGTH);
       [1, -1].forEach((dir) => {
-        const beam = new THREE.Mesh(new THREE.ConeGeometry(0.03, 2.6, 10, 1, true), beamMat);
-        beam.rotation.z = dir > 0 ? -Math.PI / 2 : Math.PI / 2;
-        beam.position.x = dir * 1.3;
+        const beam = new THREE.Mesh(beamGeo, beamMat);
+        // ConeGeometry puts its apex at +y. Rotating +90deg about z sends
+        // +y to -x, which for the +x beam points the apex back at the star
+        // and leaves the wide end outward - the way round emission actually
+        // spreads. (The other sign gives two funnels pointing inward.)
+        beam.rotation.z = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+        beam.position.x = (dir * BEAM_LENGTH) / 2;
         beamGroup.add(beam);
       });
 
-      group.userData = { coreGlow, coreMat, beamGroup };
+      // Tip the whole object out of the view plane so the magnetosphere
+      // disc is seen as an ellipse rather than edge-on as a single line,
+      // and so the beam sweep reads as a cone rather than a see-saw.
+      group.rotation.set(0.5, 0, 0.16);
+
+      group.userData = { coreGlow, haloGlow, coreMat, beamGroup, beamMat, discMat };
       objects.music = group;
     }
 
@@ -493,18 +636,64 @@
       placeObject(group, "contact");
       anchor.add(group);
 
-      const bodyMat = new THREE.MeshStandardMaterial({
+      // The real Voyager, from NASA's own model (see
+      // public/models/cosmos/License.txt). This was an octahedron, which
+      // is what "weird geometrical shape emanating rings" describes
+      // exactly - a probe is a specific, recognisable object and a
+      // stand-in solid reads as a placeholder no matter how it's lit.
+      // Unlike the Itokawa shape model this ships with baked textures, so
+      // its materials are used as authored rather than overridden.
+      //
+      // Sits inside `body`, a pivot the animation tumbles, so the loaded
+      // scene can be recentred on its own bounding box without the
+      // recentring offset fighting the rotation.
+      const body = new THREE.Group();
+      group.add(body);
+      // A neutral stand-in holds the object's place (and its measured
+      // extent) until the 3MB model lands; swapped out on load, left alone
+      // if the load fails.
+      const placeholderMat = new THREE.MeshStandardMaterial({
         color: mutedColor,
         emissive: accentColor,
         emissiveIntensity: 0.35,
         roughness: 0.4,
         metalness: 0.3,
       });
-      const body = new THREE.Mesh(new THREE.OctahedronGeometry(0.15, 0), bodyMat);
-      mutedTargets.push(bodyMat.color);
-      accentTargets.push(bodyMat.emissive);
-      group.add(body);
+      const placeholder = new THREE.Mesh(new THREE.OctahedronGeometry(0.5, 0), placeholderMat);
+      mutedTargets.push(placeholderMat.color);
+      accentTargets.push(placeholderMat.emissive);
+      body.add(placeholder);
 
+      // Large relative to the ping rings below, which are what set this
+      // object's measured extent and therefore its framing. At 1.5 the
+      // rings filled the frame and Voyager sat in the middle of them at a
+      // quarter of the height - concentric hoops with a speck inside, which
+      // is the shape of the original complaint.
+      const PROBE_SIZE = 2.9;
+      gltfLoader.load(
+        `${cosmosAssetBase}models/cosmos/voyager.glb`,
+        (gltf: any) => {
+          const probe = gltf.scene;
+          const box = new THREE.Box3().setFromObject(probe);
+          const span = box.getSize(new THREE.Vector3()).length();
+          probe.scale.setScalar(PROBE_SIZE / (span || 1));
+          // Recentre on the model's own bounds: NASA's export isn't
+          // origin-centred, and an off-centre probe would swing around a
+          // point outside itself once the tumble starts.
+          const centre = box.getCenter(new THREE.Vector3()).multiplyScalar(PROBE_SIZE / (span || 1));
+          probe.position.sub(centre);
+          body.remove(placeholder);
+          placeholder.geometry.dispose();
+          placeholderMat.dispose();
+          body.add(probe);
+        },
+        undefined,
+        (err: unknown) => console.error(LOG, "Failed to load Voyager model", err),
+      );
+
+      // Signal pings: the reason this object is Contact rather than just a
+      // spacecraft. Kept thin and faint so they read as a transmission
+      // leaving the dish rather than as decorative hoops around it.
       const PING_COUNT = 3;
       const pingMat = new THREE.MeshBasicMaterial({
         color: accentColor,
@@ -518,12 +707,17 @@
       for (let i = 0; i < PING_COUNT; i++) {
         const ringMat = pingMat.clone();
         accentTargets.push(ringMat.color);
-        const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.0, 32), ringMat);
+        const ring = new THREE.Mesh(new THREE.RingGeometry(0.985, 1.0, 96), ringMat);
+        // Tilted out of the view plane so they read as spherical wavefronts
+        // leaving the spacecraft rather than as flat hoops drawn around it,
+        // and offset per-ring so they don't stack into a bullseye.
+        ring.rotation.x = 0.62;
+        ring.rotation.z = i * 0.5;
         group.add(ring);
         pings.push(ring);
       }
 
-      group.userData = { body, pings, pingPeriod: 2.6 };
+      group.userData = { body, pings, pingPeriod: 3.4 };
       objects.contact = group;
     }
 
@@ -533,7 +727,106 @@
       placeObject(group, "playground");
       anchor.add(group);
 
-      const NEBULA_COUNT = 260;
+      // The real Hubble photography is the nebula. Earlier this was the
+      // other way round - two small photo puffs buried under a sprinkle of
+      // 260 fat, fully-saturated point sprites - and the result read as
+      // brightly coloured confetti orbiting an axis rather than as gas.
+      // Now a dozen large, overlapping, individually-rotated crops of
+      // "Pillars of Creation" and "Mystic Mountain" build the cloud, and
+      // the point cloud is demoted to what it should always have been:
+      // faint embedded stars.
+      //
+      // Each source photo is masked into a soft-edged texture exactly once
+      // and shared by every sprite drawn from it (see makeMaskedTexture),
+      // so twelve sprites cost two decodes, not twelve.
+      const NEBULA_SOURCES = ["nebula-1.jpg", "nebula-2.jpg"];
+      const nebulaSpriteMats: THREE.SpriteMaterial[] = [];
+
+      // Radially masks a photo into a texture that fades to fully
+      // transparent at its edge, so additively blended sprites overlap
+      // without showing their square borders.
+      function makeMaskedTexture(img: HTMLImageElement): THREE.CanvasTexture {
+        const size = 512;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d")!;
+        const srcSize = Math.min(img.width, img.height);
+        ctx.drawImage(img, (img.width - srcSize) / 2, (img.height - srcSize) / 2, srcSize, srcSize, 0, 0, size, size);
+        ctx.globalCompositeOperation = "destination-in";
+        const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+        gradient.addColorStop(0, "rgba(255,255,255,1)");
+        gradient.addColorStop(0.45, "rgba(255,255,255,0.85)");
+        gradient.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, size, size);
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        return tex;
+      }
+
+      // scale, x, y, z, material rotation (radians), opacity, source index.
+      // Hand-placed rather than randomised: the two source photos each have
+      // a strong directional structure, and letting them land anywhere
+      // produced obvious repeats. Larger, fainter crops sit behind; smaller,
+      // brighter ones pick out the core.
+      // Six, not more. Each of these is a large additive quad and they
+      // overlap by design, so the cloud's cost is essentially the number of
+      // them times the screen area they cover - by some margin the most
+      // expensive surface in the scene when you're inside it. Six still
+      // reads as a continuous structure; the two that were cut were the
+      // ones most redundant with their neighbours.
+      const NEBULA_PUFFS: [number, number, number, number, number, number, number][] = [
+        [3.6, -0.35,  0.10, -0.75, 0.0,  0.32, 0],
+        [3.2,  0.55, -0.15, -0.45, 2.1,  0.28, 1],
+        [2.7, -0.15, -0.45,  0.05, 4.0,  0.30, 0],
+        [2.2,  0.55,  0.35,  0.25, 1.2,  0.26, 1],
+        [1.9, -0.70,  0.28,  0.40, 3.3,  0.28, 1],
+        [1.5,  0.05, -0.12,  0.62, 0.7,  0.32, 0],
+      ];
+      NEBULA_PUFFS.forEach(([scale, x, y, z, rotation, opacity, source]) => {
+        const spriteMat = new THREE.SpriteMaterial({
+          map: glowTexture,
+          // Tinted until the photo lands, then handed over to the real
+          // image - a slow or failed load degrades to the old flat glow
+          // rather than to nothing.
+          color: hueShift(accentColor, source ? -0.14 : 0.1, 1, 0.05),
+          transparent: true,
+          opacity,
+          rotation,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.scale.set(scale, scale, 1);
+        sprite.position.set(x, y, z);
+        group.add(sprite);
+        nebulaSpriteMats.push(spriteMat);
+        spriteMat.userData = { source };
+      });
+
+      NEBULA_SOURCES.forEach((file, sourceIndex) => {
+        textureLoader.load(
+          `${cosmosAssetBase}textures/cosmos/${file}`,
+          (loaded: THREE.Texture) => {
+            const tex = makeMaskedTexture(loaded.image as HTMLImageElement);
+            nebulaSpriteMats.forEach((m) => {
+              if (m.userData.source !== sourceIndex) return;
+              m.map = tex;
+              m.color.set(0xffffff);
+              m.needsUpdate = true;
+            });
+          },
+          undefined,
+          (err: unknown) => console.error(LOG, `Failed to load nebula photo ${file}`, err),
+        );
+      });
+
+      // Embedded stars. Ten times the count at a fraction of the size, and
+      // near-white rather than saturated accent hues - the job here is to
+      // give the gas something to be lit from within, not to be the thing
+      // you look at.
+      const NEBULA_COUNT = 2200;
       const positions = new Float32Array(NEBULA_COUNT * 3);
       const colors = new Float32Array(NEBULA_COUNT * 3);
       for (let i = 0; i < NEBULA_COUNT; i++) {
@@ -542,9 +835,9 @@
         const rx = (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
         const ry = (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
         const rz = (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
-        positions[i * 3] = rx * 1.5;
-        positions[i * 3 + 1] = ry * 1.0;
-        positions[i * 3 + 2] = rz * 1.1;
+        positions[i * 3] = rx * 1.9;
+        positions[i * 3 + 1] = ry * 1.3;
+        positions[i * 3 + 2] = rz * 1.4;
       }
       const geo = new THREE.BufferGeometry();
       geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -552,7 +845,13 @@
       geo.setAttribute("color", colorAttr);
 
       function paintNebulaColors() {
-        const huePalette = [hueShift(accentColor, 0), hueShift(accentColor, 0.14, 1.1, 0.05), hueShift(accentColor, -0.16, 0.9, -0.02)];
+        const white = new THREE.Color(0xffffff);
+        const huePalette = [
+          white.clone().lerp(hueShift(accentColor, 0), 0.25),
+          white.clone().lerp(hueShift(accentColor, 0.14, 1.1, 0.05), 0.35),
+          white.clone().lerp(hueShift(accentColor, -0.16, 0.9, -0.02), 0.3),
+          white,
+        ];
         for (let i = 0; i < NEBULA_COUNT; i++) {
           const c = huePalette[i % huePalette.length];
           colorAttr.setXYZ(i, c.r, c.g, c.b);
@@ -567,7 +866,7 @@
         // other transform here - so the group scale has to be applied by
         // hand or the cloud stays a sprinkle of pinpricks after the nebula
         // grows to 120 units across.
-        size: 0.08 * OBJECT_LAYOUT.playground.scale,
+        size: 0.012 * OBJECT_LAYOUT.playground.scale,
         // Without a map a point renders as a hard square. That was
         // invisible while these were sub-pixel specks; at nebula scale
         // they're tens of units across and read as literal pixel blocks,
@@ -575,7 +874,7 @@
         map: glowTexture,
         vertexColors: true,
         transparent: true,
-        opacity: 0.8,
+        opacity: 0.9,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         sizeAttenuation: true,
@@ -583,63 +882,10 @@
       const points = new THREE.Points(geo, mat);
       group.add(points);
 
-      // A few soft additive puffs beneath the point sprinkle give the cloud
-      // real volume, rather than reading as scattered dust. Real Hubble
-      // photography (see public/textures/cosmos/License.txt), radially
-      // masked on load into the same soft-edged falloff makeGlowTexture
-      // uses, so it blends the same way while showing real nebula detail
-      // instead of a flat gradient. Falls back to the flat gradient - tinted
-      // per the hue-shifted accent, same as before - until the photo loads.
-      function makeNebulaSprite(scale: number, opacity: number, file: string, fallbackTint: THREE.Color): THREE.Sprite {
-        const mat = new THREE.SpriteMaterial({
-          map: glowTexture,
-          color: fallbackTint,
-          transparent: true,
-          opacity,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        });
-        const sprite = new THREE.Sprite(mat);
-        sprite.scale.set(scale, scale, 1);
-
-        textureLoader.load(
-          `${cosmosAssetBase}textures/cosmos/${file}`,
-          (loaded: THREE.Texture) => {
-            const img = loaded.image as HTMLImageElement;
-            const size = 256;
-            const canvas = document.createElement("canvas");
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext("2d")!;
-            const srcSize = Math.min(img.width, img.height);
-            ctx.drawImage(img, (img.width - srcSize) / 2, (img.height - srcSize) / 2, srcSize, srcSize, 0, 0, size, size);
-            ctx.globalCompositeOperation = "destination-in";
-            const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-            gradient.addColorStop(0, "rgba(255,255,255,1)");
-            gradient.addColorStop(0.55, "rgba(255,255,255,0.7)");
-            gradient.addColorStop(1, "rgba(255,255,255,0)");
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, size, size);
-            const tex = new THREE.CanvasTexture(canvas);
-            tex.colorSpace = THREE.SRGBColorSpace;
-            mat.map = tex;
-            mat.color.set(0xffffff);
-            mat.needsUpdate = true;
-          },
-          undefined,
-          (err: unknown) => console.error(LOG, `Failed to load nebula photo ${file}`, err),
-        );
-
-        return sprite;
-      }
-      const puff1 = makeNebulaSprite(2.6, 0.16, "nebula-1.jpg", hueShift(accentColor, 0.1, 1, 0.05));
-      const puff2 = makeNebulaSprite(2.0, 0.14, "nebula-2.jpg", hueShift(accentColor, -0.14, 1, 0));
-      puff2.position.set(0.5, -0.2, -0.3);
-      group.add(puff1, puff2);
-
       const repaintPuffs = () => {
-        (puff1.material as THREE.SpriteMaterial).color.copy(hueShift(accentColor, 0.1, 1, 0.05));
-        (puff2.material as THREE.SpriteMaterial).color.copy(hueShift(accentColor, -0.14, 1, 0));
+        nebulaSpriteMats.forEach((m) => {
+          if (m.map === glowTexture) m.color.copy(hueShift(accentColor, m.userData.source ? -0.14 : 0.1, 1, 0.05));
+        });
       };
 
       group.userData = { points, paintNebulaColors, repaintPuffs };
@@ -653,41 +899,91 @@
       group.rotation.x = THREE.MathUtils.degToRad(58);
       anchor.add(group);
 
-      const GALAXY_COUNT = 420;
+      // 420 points spread over two arms is roughly 200 per arm - close
+      // enough to a dotted line that the spiral had to be inferred rather
+      // than seen. Ten times as many, an order of magnitude smaller, is the
+      // difference between a diagram of a galaxy and a galaxy.
+      const GALAXY_COUNT = 4600;
       const ARMS = 2;
+      // Fraction of the points that form the central bulge instead of the
+      // arms. Real spirals are far brighter in the middle than any arm, and
+      // without this the core was just wherever the arms happened to meet.
+      // Kept low on purpose: a third of the points in the bulge swamped the
+      // arms completely and the galaxy became a fuzzy ball.
+      const BULGE_FRACTION = 0.13;
       const positions = new Float32Array(GALAXY_COUNT * 3);
       const colors = new Float32Array(GALAXY_COUNT * 3);
       const galaxyT = new Float32Array(GALAXY_COUNT);
+      const bulgeCount = Math.floor(GALAXY_COUNT * BULGE_FRACTION);
       for (let i = 0; i < GALAXY_COUNT; i++) {
-        const t = i / GALAXY_COUNT;
+        if (i < bulgeCount) {
+          // Centre-weighted blob: cube the uniform sample so density climbs
+          // steeply toward the middle.
+          const u = Math.random();
+          const radius = u * u * u * 0.3;
+          const theta = Math.random() * Math.PI * 2;
+          const phi = Math.acos(2 * Math.random() - 1);
+          galaxyT[i] = radius / 1.6;
+          positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+          // Flattened, not spherical - a bulge is a squashed ellipsoid.
+          positions[i * 3 + 1] = radius * Math.cos(phi) * 0.42;
+          positions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
+          continue;
+        }
+        const t = (i - bulgeCount) / (GALAXY_COUNT - bulgeCount);
         galaxyT[i] = t;
         const armIndex = i % ARMS;
         const radius = Math.pow(t, 0.6) * 1.6;
-        const angle = t * Math.PI * 5 + armIndex * ((Math.PI * 2) / ARMS) + (Math.random() - 0.5) * 0.3;
-        const jitter = (Math.random() - 0.5) * 0.12 * (1 - t * 0.5);
-        positions[i * 3] = Math.cos(angle) * radius + jitter;
-        positions[i * 3 + 1] = (Math.random() - 0.5) * 0.05 * (1 - t);
-        positions[i * 3 + 2] = Math.sin(angle) * radius + jitter;
+        // Arm scatter grows with radius: arms are tightly defined near the
+        // core and fray at the edge, and a constant jitter looked stencilled.
+        const spread = 0.06 + t * 0.22;
+        const angle = t * Math.PI * 5 + armIndex * ((Math.PI * 2) / ARMS) + (Math.random() - 0.5) * 0.5;
+        positions[i * 3] = Math.cos(angle) * radius + (Math.random() - 0.5) * spread;
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 0.07 * (1 - t * 0.6);
+        positions[i * 3 + 2] = Math.sin(angle) * radius + (Math.random() - 0.5) * spread;
       }
       const geo = new THREE.BufferGeometry();
       geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
       const colorAttr = new THREE.BufferAttribute(colors, 3);
       geo.setAttribute("color", colorAttr);
 
+      // Per-star brightness, fixed once so repaints stay stable. Without
+      // it every point is exactly as bright as every other and the arms
+      // read as a stipple pattern - an even dot screen is the one thing no
+      // photograph of a galaxy has ever looked like.
+      const galaxyLum = new Float32Array(GALAXY_COUNT);
+      for (let i = 0; i < GALAXY_COUNT; i++) {
+        const r = Math.random();
+        galaxyLum[i] = 0.3 + r * r * 0.7;
+      }
+
       function paintGalaxyColors() {
-        const core = new THREE.Color(0xffffff);
-        const edge = hueShift(accentColor, 0.05, 1, -0.05);
+        const core = new THREE.Color(0xfff2dc);
+        const edge = hueShift(accentColor, 0.05, 1, 0.12);
+        const mixed = new THREE.Color();
         for (let i = 0; i < GALAXY_COUNT; i++) {
-          const mixed = core.clone().lerp(edge, Math.min(1, galaxyT[i] * 1.2));
+          // Only the outer half of the arms takes the accent tint; holding
+          // the inner arms near the core's warm white is what keeps the
+          // spiral legible as a continuous structure rather than a bright
+          // ball with a separate blue halo around it.
+          mixed.copy(core).lerp(edge, Math.min(1, Math.max(0, galaxyT[i] - 0.15) * 1.4));
+          mixed.multiplyScalar(galaxyLum[i]);
           colorAttr.setXYZ(i, mixed.r, mixed.g, mixed.b);
+          if (i % HAZE_STRIDE === 0) {
+            const h = i / HAZE_STRIDE;
+            if (h < hazeCount) hazeColorAttr.setXYZ(h, mixed.r, mixed.g, mixed.b);
+          }
         }
         colorAttr.needsUpdate = true;
+        hazeColorAttr.needsUpdate = true;
       }
-      paintGalaxyColors();
 
       const mat = new THREE.PointsMaterial({
         // Hand-applied group scale - see the note on the nebula's cloud.
-        size: 0.05 * OBJECT_LAYOUT.photography.scale,
+        // 0.009 was too far the other way: individually correct-looking
+        // stars that collectively left the arms below the threshold of
+        // being visible at all from 660 units out.
+        size: 0.022 * OBJECT_LAYOUT.photography.scale,
         map: glowTexture,
         vertexColors: true,
         transparent: true,
@@ -699,13 +995,100 @@
       const points = new THREE.Points(geo, mat);
       group.add(points);
 
-      const coreGlow = makeGlowSprite(0.6, 0.5, new THREE.Color(0xffffff));
+      // A second, much softer pass that turns a field of separate dots into
+      // gas with stars in it. Built from every third point rather than all
+      // of them: these sprites are ten times the area of the star points,
+      // so they are the most expensive thing the galaxy draws, and at this
+      // size and opacity a third of them overlap into the same continuous
+      // haze the full set did.
+      const HAZE_STRIDE = 2;
+      const hazeCount = Math.floor(GALAXY_COUNT / HAZE_STRIDE);
+      const hazePositions = new Float32Array(hazeCount * 3);
+      const hazeColors = new Float32Array(hazeCount * 3);
+      for (let i = 0; i < hazeCount; i++) {
+        const src = i * HAZE_STRIDE;
+        hazePositions[i * 3] = positions[src * 3];
+        hazePositions[i * 3 + 1] = positions[src * 3 + 1];
+        hazePositions[i * 3 + 2] = positions[src * 3 + 2];
+      }
+      const hazeGeo = new THREE.BufferGeometry();
+      hazeGeo.setAttribute("position", new THREE.BufferAttribute(hazePositions, 3));
+      const hazeColorAttr = new THREE.BufferAttribute(hazeColors, 3);
+      hazeGeo.setAttribute("color", hazeColorAttr);
+      const hazeMat = new THREE.PointsMaterial({
+        size: 0.1 * OBJECT_LAYOUT.photography.scale,
+        map: glowTexture,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.12,
+        depthWrite: false,
+        sizeAttenuation: true,
+        ...ADDITIVE_RGB_ONLY,
+      });
+      const haze = new THREE.Points(hazeGeo, hazeMat);
+      group.add(haze);
+
+      // Painted only now: the ramp fills the star buffer and the haze
+      // buffer in one pass, so it has to run after both exist.
+      paintGalaxyColors();
+
+      // Small and warm. A wide white glow here just washed the inner arms
+      // out - the bulge's own point density is doing most of this work now.
+      const coreGlow = makeGlowSprite(0.34, 0.42, new THREE.Color(0xfff0d4), null);
       group.add(coreGlow);
 
-      group.userData = { points, paintGalaxyColors, coreGlow };
+      group.userData = { points, haze, paintGalaxyColors, coreGlow };
       objects.photography = group;
     }
     } // end if (isDesktop)
+
+    // Only used when there are no objects at all (mobile tier): a plain
+    // wide shot of the starfield around the origin.
+    const IDLE_CAMERA_Z = 13;
+
+    // ---- Framing: parking distances derived from what was actually built ----
+    // Each object's world-space extent, measured once from the finished
+    // group. Everything that needs "how far back should the camera sit for
+    // this object" goes through standoffFor(), so the answer can never
+    // drift out of step with the geometry the way six hand-written numbers
+    // did.
+    const objectExtent: Partial<Record<CosmosKey, { x: number; y: number }>> = {};
+    {
+      const box = new THREE.Box3();
+      const size = new THREE.Vector3();
+      (Object.keys(objects) as CosmosKey[]).forEach((key) => {
+        box.setFromObject(objects[key]!);
+        box.getSize(size);
+        objectExtent[key] = { x: size.x, y: size.y };
+      });
+    }
+
+    // Distance at which `frame` of the viewport is filled by the object,
+    // in whichever axis is the tighter constraint. Recomputed rather than
+    // cached because it depends on the live camera aspect - a galaxy that
+    // fits a wide window edge-to-edge has to be backed away from in a
+    // portrait one.
+    function standoffFor(key: CosmosKey): number {
+      const extent = objectExtent[key];
+      const frame = OBJECT_LAYOUT[key].frame;
+      if (!extent || frame <= 0) return IDLE_CAMERA_Z;
+      const halfFovTan = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+      const forHeight = extent.y / (2 * frame * halfFovTan);
+      const forWidth = extent.x / (2 * frame * halfFovTan * camera.aspect);
+      // Never park inside the near plane, whatever the measurements say.
+      return Math.max(forHeight, forWidth, camera.near * 2.5);
+    }
+
+    // x/y offsets are multiples of the parking distance, so they have to
+    // wait until that distance is known. Re-run on resize for the same
+    // reason standoffFor() is: aspect changes move the goalposts.
+    function placeObjects() {
+      (Object.keys(objects) as CosmosKey[]).forEach((key) => {
+        const layout = OBJECT_LAYOUT[key];
+        const standoff = standoffFor(key);
+        objects[key]!.position.set(layout.offset[0] * standoff, layout.offset[1] * standoff, layout.z);
+      });
+    }
 
     function resize() {
       const rect = container!.getBoundingClientRect();
@@ -714,7 +1097,7 @@
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
-
+      placeObjects();
     }
     resize();
     window.addEventListener("resize", resize);
@@ -738,21 +1121,40 @@
     const dimCurrent: Record<CosmosKey, number> = { about: 1, projects: 1, playground: 1, music: 1, photography: 1, contact: 1 };
     const objectWorldPos = new THREE.Vector3();
     const framedTarget = new THREE.Vector3();
+    const cullWorldPos = new THREE.Vector3();
+    // Roughly 0.6% of the frame height at this field of view. Below that an
+    // object is a couple of pixels; the depth haze has it near the dim floor
+    // anyway, so nothing visible is lost by not drawing it.
+    const CULL_ANGULAR_SIZE = 0.006;
     const cameraRig = createCameraRig(camera, 0.06);
-    // Only used when there are no objects at all (mobile tier): a plain
-    // wide shot of the starfield around the origin.
-    const IDLE_CAMERA_Z = 13;
 
     // ---- Homepage spatial journey: scrolling the tall container HomeMenu
     // renders drives a continuous depth value across the same six waypoints
     // hover-focus above uses, in the menu's own narrative order, instead of
-    // one-object-at-a-time hover framing. journeyDepthProgress() reads raw
-    // scroll position each frame (no separate easing layer needed - the
-    // cameraRig's own lerp toward whatever target we hand it already
-    // supplies the accelerate/decelerate/settle feel). Confined to the
-    // desktop hero (homepage) state: inner "backdrop" pages have no tall
-    // scroll container and keep using hover/route framing above unchanged. ----
+    // one-object-at-a-time hover framing. Confined to the desktop hero
+    // (homepage) state: inner "backdrop" pages have no tall scroll
+    // container and keep using hover/route framing above unchanged. ----
     const DEPTH_ORDER: CosmosKey[] = ["playground", "projects", "photography", "music", "about", "contact"];
+    // Fraction of each leg's scroll spent held on the waypoint you're
+    // leaving and the one you're reaching. Without these the mapping from
+    // scroll to depth was linear, which meant the camera was only ever
+    // *exactly* at an object at one infinitesimal scroll position and spent
+    // the rest of the time in the empty space between two - so a section
+    // never held focus for long enough to look at, which is precisely how
+    // it felt. Now most of each leg is a dwell and the move happens in the
+    // middle, with a smootherstep giving the accelerate/travel/decelerate/
+    // settle shape rather than a constant-velocity slide.
+    const LEG_HOLD_START = 0.42;
+    const LEG_HOLD_END = 0.80;
+    // Deliberately tight. The rig's lerp is exponential, so a fixed rate
+    // leaves a residual error proportional to the distance travelled - and
+    // a leg here can be 2000 units long while the pulsar wants to be viewed
+    // from 14. Being "99% of the way there" frames the galaxy perfectly and
+    // leaves the pulsar a tenth of its intended size, which is most of why
+    // some waypoints looked like they never arrived. The cinematic shape
+    // comes from the smootherstep on the *target* (above), not from this;
+    // this only needs to be smooth enough not to read as a snap.
+    const JOURNEY_EASE = 0.22;
     // Objects away from the current waypoint fade rather than vanish - this
     // is the scene's depth haze. Deliberately gentle: distance already
     // shrinks them to specks, and the far ones (a galaxy hanging behind the
@@ -765,10 +1167,27 @@
     function journeyActive(): boolean {
       return isDesktop && cosmosMode === "hero";
     }
-    function journeyDepthProgress(): number {
+    // Length of one leg in pixels, taken from the scroll track HomeMenu
+    // actually rendered rather than assumed to be one viewport - the track
+    // height is set in that component's CSS, and reading it here keeps the
+    // two from silently disagreeing when it changes.
+    function legLength(): number {
+      const track = document.getElementById("home-journey");
       const vh = window.innerHeight || 1;
+      const legs = DEPTH_ORDER.length - 1;
+      const scrollable = track ? track.offsetHeight - vh : vh * legs;
+      return Math.max(1, scrollable / legs);
+    }
+
+    function journeyDepthProgress(): number {
       const max = DEPTH_ORDER.length - 1;
-      return THREE.MathUtils.clamp(window.scrollY / vh, 0, max);
+      const raw = THREE.MathUtils.clamp(window.scrollY / legLength(), 0, max);
+      const i = Math.floor(raw);
+      const f = raw - i;
+      const t = THREE.MathUtils.clamp((f - LEG_HOLD_START) / (LEG_HOLD_END - LEG_HOLD_START), 0, 1);
+      // smootherstep - zero velocity *and* zero acceleration at both ends,
+      // so arriving at a waypoint settles rather than stopping dead.
+      return i + t * t * t * (t * (t * 6 - 15) + 10);
     }
     // Inner pages settle a little further out than the homepage's own
     // waypoint shot, but only a little: you flew here, and the object you
@@ -793,7 +1212,7 @@
     // frame.
     const WARP_DIVE_MIN = 0.62;
     function warpStandoff(key: CosmosKey): number {
-      return Math.max(OBJECT_LAYOUT[key].standoff * WARP_DIVE_FACTOR, WARP_DIVE_MIN);
+      return Math.max(standoffFor(key) * WARP_DIVE_FACTOR, WARP_DIVE_MIN);
     }
 
     // How far off-centre to frame the focused object. Returned in world
@@ -840,20 +1259,16 @@
         objects[DEPTH_ORDER[i0]]!.getWorldPosition(journeyPointA);
         objects[DEPTH_ORDER[i1]]!.getWorldPosition(journeyPointB);
         objectWorldPos.lerpVectors(journeyPointA, journeyPointB, frac);
-        standoff = THREE.MathUtils.lerp(
-          OBJECT_LAYOUT[DEPTH_ORDER[i0]].standoff,
-          OBJECT_LAYOUT[DEPTH_ORDER[i1]].standoff,
-          frac,
-        );
+        standoff = THREE.MathUtils.lerp(standoffFor(DEPTH_ORDER[i0]), standoffFor(DEPTH_ORDER[i1]), frac);
       } else if (focusKey) {
         objects[focusKey]!.getWorldPosition(objectWorldPos);
-        standoff = OBJECT_LAYOUT[focusKey].standoff * (cosmosMode === "backdrop" ? BACKDROP_STANDOFF_MULTIPLIER : 1);
+        standoff = standoffFor(focusKey) * (cosmosMode === "backdrop" ? BACKDROP_STANDOFF_MULTIPLIER : 1);
       } else if (isDesktop) {
         // Homepage with the loop never running (reduced motion): settle on
         // the first waypoint rather than the origin, which is now empty
         // space 400 units short of the nearest object.
         objects[DEPTH_ORDER[0]]!.getWorldPosition(objectWorldPos);
-        standoff = OBJECT_LAYOUT[DEPTH_ORDER[0]].standoff;
+        standoff = standoffFor(DEPTH_ORDER[0]);
       } else {
         objectWorldPos.set(0, 0, 0);
         standoff = IDLE_CAMERA_Z;
@@ -982,18 +1397,41 @@
       } else {
         setPageTransit(null);
       }
-      if (!instant) return;
+      const standoff = computeCameraTarget(framedTarget);
+      // Is the camera close enough to this object for easing toward it to
+      // mean anything?
+      //
+      // The rig's lerp is exponential, so what it leaves behind is a
+      // *proportional* error - and the two quantities here are wildly out
+      // of scale with each other. A cold load starts the camera 8000 units
+      // from Contact, which wants to be viewed from under four; easing that
+      // in still leaves the camera tens of units short long after the page
+      // has settled, and the probe renders as a speck in the middle of the
+      // screen instead of framed in the margin. Nobody flew anywhere in
+      // that case - the visitor typed a URL or clicked a header link - so
+      // there is no journey to preserve and the honest thing is to be there
+      // already.
+      //
+      // A warp arrival is the case this deliberately excludes: the camera
+      // is right up against the object at that moment, well inside the
+      // ratio, so it keeps easing out of the dive as Tier 2 intends.
+      const ROUTE_SNAP_RATIO = 25;
+      const arrivingFromFar = camera.position.distanceTo(framedTarget) > standoff * ROUTE_SNAP_RATIO;
+
+      if (!instant && !arrivingFromFar) return;
+
       // Reduced motion never runs the animate() loop below, so the eased
       // approach never happens on its own — snap directly to the settled
       // shot and render exactly one frame, same policy as the idle scene.
-      ALL_KEYS.forEach((key) => {
-        dimCurrent[key] = focusKey === null ? 1 : key === focusKey ? 1 : DIM_FLOOR;
-      });
-      const standoff = computeCameraTarget(framedTarget);
+      if (instant) {
+        ALL_KEYS.forEach((key) => {
+          dimCurrent[key] = focusKey === null ? 1 : key === focusKey ? 1 : DIM_FLOOR;
+        });
+      }
       cameraRig.setTarget(framedTarget, standoff);
       cameraRig.snapToTarget();
       starfield.group.position.copy(camera.position);
-      renderer.render(scene, camera);
+      if (instant) renderer.render(scene, camera);
     }
     // Fires on the first load and on every subsequent client-side
     // navigation alike once <ClientRouter /> is active in BaseLayout; a
@@ -1025,11 +1463,31 @@
         // purely a function of true size and distance, which is the entire
         // point - it's what lets a galaxy read as a galaxy and a probe as a
         // probe rather than as six equally-sized ornaments.
+
+        // Drop objects that have shrunk past the point of contributing
+        // anything. This matters far more here than in a conventional
+        // scene: the objects span 8000 units of depth, so at any moment
+        // four or five of the six are hundreds or thousands of units away
+        // and measure a fraction of a pixel - while still paying for every
+        // vertex and every fragment of a 20k-triangle spacecraft or a 9200
+        // point galaxy. Keyed off real projected size rather than a fixed
+        // distance, since "far" means something different for each of them.
+        const group = objects[key]!;
+        group.getWorldPosition(cullWorldPos);
+        const distance = cullWorldPos.distanceTo(camera.position);
+        const extent = objectExtent[key];
+        group.visible = !extent || distance <= 0 || extent.y / distance > CULL_ANGULAR_SIZE;
       });
 
       const standoff = computeCameraTarget(framedTarget);
       cameraRig.setTarget(framedTarget, standoff);
-      cameraRig.update(warpKey ? WARP_EASE : undefined);
+      // The idle 0.06 is a ~270ms lag to catch 63% of a move. That is fine
+      // for a hover preview and far too slow for a scroll-driven camera:
+      // scrolling at any speed left the rig permanently chasing a target it
+      // never reached, so no object was ever actually framed. The journey
+      // gets a tighter lerp; the dwell curve above is what keeps it from
+      // feeling snappy, since during a hold the target isn't moving at all.
+      cameraRig.update(warpKey ? WARP_EASE : inJourney ? JOURNEY_EASE : undefined);
 
       // Stars are the one thing that should never fall behind: the camera
       // travels ~7800 units, far outside the fixed shells they're built on,
@@ -1047,7 +1505,7 @@
       about.star.scale.setScalar(starPulse);
       about.coronaInner.material.opacity = (0.5 + Math.sin(clock * 0.9) * 0.1) * dimCurrent.about;
       about.coronaOuter.material.opacity = (0.24 + Math.sin(clock * 0.6 + 1) * 0.06) * dimCurrent.about;
-      about.starMat.emissiveIntensity = 0.9 * (0.35 + 0.65 * dimCurrent.about);
+      about.starMat.color.setScalar(0.45 + 0.55 * dimCurrent.about);
 
       const projects = objects.projects!.userData;
       projects.planetPivots.forEach((pivot: THREE.Group, i: number) => {
@@ -1066,27 +1524,46 @@
       // rhythmic "beat" rather than a slow breathing glow.
       const beat = Math.max(0, Math.sin(clock * 2.4));
       const flash = Math.pow(beat, 10);
-      music.coreGlow.material.opacity = (0.4 + flash * 0.6) * dimCurrent.music;
+      music.coreGlow.material.opacity = (0.5 + flash * 0.5) * dimCurrent.music;
+      music.haloGlow.material.opacity = (0.22 + flash * 0.25) * dimCurrent.music;
       music.coreMat.emissiveIntensity = (1.2 + flash * 1.8) * dimCurrent.music;
+      // The beams brighten on the beat too: the flash and the sweep are the
+      // same event, which is the whole reason this object is Music.
+      music.beamMat.opacity = (0.34 + flash * 0.34) * dimCurrent.music;
+      music.discMat.opacity = (0.16 + flash * 0.14) * dimCurrent.music;
 
       const contact = objects.contact!.userData;
-      contact.body.rotation.x += 0.006;
-      contact.body.rotation.y += 0.009;
+      // Slow and mostly about one axis: a real probe is attitude-stabilised
+      // with its dish held on Earth, so a lazy drift reads right where a
+      // free tumble would look like debris.
+      contact.body.rotation.y += 0.0035;
+      contact.body.rotation.x = Math.sin(clock * 0.25) * 0.12;
       contact.pings.forEach((ring: THREE.Mesh, i: number) => {
         const phase = ((clock + (i * contact.pingPeriod) / contact.pings.length) % contact.pingPeriod) / contact.pingPeriod;
         const scale = 0.15 + phase * 1.6;
         ring.scale.setScalar(scale);
-        (ring.material as THREE.MeshBasicMaterial).opacity = (1 - phase) * 0.4 * dimCurrent.contact;
+        // Fade in as well as out, so a ring appears out of the spacecraft
+        // rather than popping into existence at full strength on top of it.
+        const envelope = Math.min(1, phase * 5) * (1 - phase);
+        (ring.material as THREE.MeshBasicMaterial).opacity = envelope * 0.3 * dimCurrent.contact;
       });
 
       const playground = objects.playground!.userData;
-      playground.points.rotation.y += 0.0009;
-      playground.points.material.opacity = 0.8 * dimCurrent.playground;
+      // No rotation. A nebula is light-years of gas; anything you could see
+      // turning is wrong, and the old 0.0009/frame drift (a full revolution
+      // every two minutes) was the single biggest reason the cloud read as
+      // a spinning ornament. Its life now comes from parallax as the camera
+      // moves through it, which is real motion rather than simulated.
+      playground.points.material.opacity = 0.9 * dimCurrent.playground;
 
       const photography = objects.photography!.userData;
-      photography.points.rotation.z += 0.0006;
+      // A quarter of the old rate. The previous 0.0006/frame was a full
+      // revolution every three minutes, fast enough to read as a spinning
+      // pinwheel; this is slow enough to be felt rather than watched.
+      photography.points.rotation.z += 0.00015;
       photography.points.material.opacity = 0.85 * dimCurrent.photography;
-      photography.coreGlow.material.opacity = 0.5 * dimCurrent.photography;
+      photography.haze.material.opacity = 0.09 * dimCurrent.photography;
+      photography.coreGlow.material.opacity = 0.42 * dimCurrent.photography;
       } // end if (isDesktop)
 
       renderer.render(scene, camera);
