@@ -24,5 +24,5 @@ pnpm-debug.log*
 .idea/
 
 .vscode/
-# Claude Code per-machine permission grants (absolute paths, local only)
-.claude/settings.local.json
+# Claude Code local tooling and per-machine permission grants
+.claude/
