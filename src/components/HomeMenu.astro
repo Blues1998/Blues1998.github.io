@@ -95,7 +95,11 @@ const menuItems = [
 <style>
   .home-hero {
     position: relative;
-    overflow: hidden;
+    /* Deliberately no overflow:hidden here - it would establish this as a
+       scroll-clipping ancestor for the sticky panel below, which breaks
+       position:sticky (the browser stops tracking real document scroll and
+       the panel just scrolls away with the page instead of pinning). Nothing
+       here actually overflows its box, so there was nothing to clip. */
     /* No opaque fill here: the cosmos scene is a persisted, fixed backdrop
        mounted in BaseLayout, behind this whole page. An opaque background
        on this element would paint over it and hide it on the homepage. */
