@@ -24,7 +24,10 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, defaultEase = 0
   let targetZ = camera.position.z;
 
   function apply() {
-    camera.position.set(0, 0, currentLookAt.z + currentZ);
+    // Tracks the target laterally as well as in depth, so callers can frame
+    // an object off-centre (or pan for parallax) purely by offsetting the
+    // look-at point, without the rig fighting them by snapping back to x=0.
+    camera.position.set(currentLookAt.x, currentLookAt.y, currentLookAt.z + currentZ);
     camera.lookAt(currentLookAt);
   }
 

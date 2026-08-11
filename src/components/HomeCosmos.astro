@@ -78,6 +78,7 @@
   import { detectDeviceTier, getStarfieldProfile } from "../lib/cosmos/deviceTier";
   import { createStarfield } from "../lib/cosmos/starfield";
   import { createCameraRig } from "../lib/cosmos/cameraRig";
+  import { createTransitDust, type TransitDust } from "../lib/cosmos/transitDust";
 
   const LOG = "[HomeCosmos]";
 
@@ -110,7 +111,11 @@
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+    // Far plane reaches past the galaxy waypoint (~4000 units out, 600
+    // across); near plane is pulled back from 0.1 to 0.5 to claw back depth
+    // precision over that range - safe because the closest the camera ever
+    // parks is ~0.9 units from the probe's near edge.
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 20000);
     camera.position.set(0, 0, 13);
     camera.lookAt(0, 0, 0);
 
@@ -192,6 +197,10 @@
     const starfield = createStarfield(starfieldProfile, accentColor, reduceMotion);
     scene.add(starfield.group);
 
+    // Created only alongside the six-object scene: it exists to sell travel
+    // between waypoints, and mobile has neither the objects nor the journey.
+    let transitDust: TransitDust | null = null;
+
     function makeGlowSprite(scale: number, opacity: number, initialColor = accentColor, track: THREE.Color[] | null = accentTargets): THREE.Sprite {
       const mat = new THREE.SpriteMaterial({
         map: glowTexture,
@@ -219,42 +228,87 @@
     type CosmosKey = "about" | "projects" | "playground" | "music" | "photography" | "contact";
     const objects: Partial<Record<CosmosKey, THREE.Group>> = {};
 
+    // ---- Spatial layout ----
+    // Previously all six objects shared an ~8-unit-deep shell viewed from
+    // ~10 units away, every one scaled into the same on-screen envelope.
+    // That's why it read as a diagram of space rather than space: a galaxy,
+    // a star and a hand-sized probe all had the same visual weight.
+    //
+    // Now each object is built at its true relative extent and parked at
+    // its own depth. `scale` maps the group's locally-built size (all are
+    // roughly 1.5 units across as authored) onto that real extent, and
+    // `standoff` is how far the camera parks from it - kept proportional to
+    // the extent so everything still frames well despite spanning ~2000x in
+    // size. That proportionality is what does the real work: it means a
+    // probe fills the frame from a metre away while a galaxy fills it from
+    // a thousand units away, and everything *not* being visited is left at
+    // its true angular size, which is usually a speck or nothing at all.
+    //
+    // x/y are fractions of each object's own standoff, so the flight path
+    // weaves instead of running straight down the z axis (an object's own
+    // offset doesn't affect its framing - the camera centres on it either
+    // way - it only changes where its neighbours sit in frame).
+    const OBJECT_LAYOUT: Record<CosmosKey, { pos: [number, number, number]; scale: number; standoff: number }> = {
+      playground:  { pos: [52.5, 21, -400],     scale: 37.5,  standoff: 210 },   // nebula
+      projects:    { pos: [-9.6, 7.2, -1400],   scale: 8.3,   standoff: 48 },    // planetary system
+      photography: { pos: [157, -210, -4000],   scale: 187.5, standoff: 1050 },  // galaxy
+      music:       { pos: [-0.9, -0.3, -6000],  scale: 0.23,  standoff: 2.2 },   // pulsar
+      about:       { pos: [2.7, 3.4, -7000],    scale: 2.14,  standoff: 13.5 },  // star
+      contact:     { pos: [-0.16, 0.21, -8000], scale: 0.094, standoff: 1.05 },  // probe
+    };
+
+    function placeObject(group: THREE.Group, key: CosmosKey) {
+      const layout = OBJECT_LAYOUT[key];
+      group.position.set(layout.pos[0], layout.pos[1], layout.pos[2]);
+      group.scale.setScalar(layout.scale);
+    }
+
     // The six narrative objects are part of the desktop game-menu
     // experience (see HomeMenu.astro) and stay desktop-only for this
     // phase - foundation work here is the starfield above, not a mobile
     // redesign of the menu scene.
     if (isDesktop) {
+    transitDust = createTransitDust(200, accentColor);
+    scene.add(transitDust.object);
+
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     scene.add(ambientLight);
 
-    // Lights are children of the anchor, not the scene: the anchor's world
-    // offset can be large (the system leans well right of origin), so
-    // fixed-in-world-space lights would fall off to near-black on the far
-    // side of the system. Keeping them local means every object gets the
-    // same relative lighting regardless of where the anchor sits.
-    const keyLight = new THREE.PointLight(0xffffff, 45, 0, 2);
+    // Directional, not point, lights. A point light's inverse-square
+    // falloff was fine when every object sat within ~8 units of the anchor,
+    // but the objects now span 8000 units of depth and are scaled by up to
+    // 187x - any point light bright enough for the probe would blow out the
+    // nebula, and any light tuned for the nebula leaves everything past it
+    // black. Directional light has neither distance nor scale dependence
+    // (only direction), so one key/rim pair lights all six identically.
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.6);
     keyLight.position.set(4, 5, 8);
-    anchor.add(keyLight);
-    const rimLight = new THREE.PointLight(0xffffff, 16, 0, 2);
+    scene.add(keyLight);
+    const rimLight = new THREE.DirectionalLight(0xffffff, 1.1);
     rimLight.position.set(-5, -3, -2);
-    anchor.add(rimLight);
+    scene.add(rimLight);
 
     // ---- About: the star ----
     {
       const group = new THREE.Group();
-      group.position.set(1.0, 0.4, 0.5);
+      placeObject(group, "about");
       anchor.add(group);
 
+      // A star is its own light source, so the Sun texture drives emissive
+      // as well as diffuse - it reads correctly no matter where the scene
+      // lights point, and can't go dark now that it sits 7000 units from
+      // the lighting rig's nominal origin.
+      const sunTexture = loadCosmosTexture("sun-2k.jpg");
       const starMat = new THREE.MeshStandardMaterial({
-        map: loadCosmosTexture("sun-2k.jpg"),
+        map: sunTexture,
+        emissiveMap: sunTexture,
         color: 0xffffff,
-        emissive: accentColor,
-        emissiveIntensity: 0.15,
+        emissive: 0xffffff,
+        emissiveIntensity: 0.9,
         roughness: 1,
         metalness: 0,
       });
       const star = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5, 3), starMat);
-      accentTargets.push(starMat.emissive);
       group.add(star);
 
       const coronaInner = makeGlowSprite(1.6, 0.55);
@@ -268,7 +322,7 @@
     // ---- Projects: a small planetary system ----
     {
       const group = new THREE.Group();
-      group.position.set(3.6, 1.1, -1.0);
+      placeObject(group, "projects");
       anchor.add(group);
 
       const hubGlow = makeGlowSprite(0.4, 0.5, mutedColor, mutedTargets);
@@ -386,7 +440,7 @@
     // ---- Music: a pulsar, rotating beam + rhythmic flash ----
     {
       const group = new THREE.Group();
-      group.position.set(4.6, -1.6, 0.8);
+      placeObject(group, "music");
       anchor.add(group);
 
       const coreMat = new THREE.MeshStandardMaterial({
@@ -426,7 +480,7 @@
     // ---- Contact: a probe emitting expanding signal-ping rings ----
     {
       const group = new THREE.Group();
-      group.position.set(2.2, -2.0, 2.0);
+      placeObject(group, "contact");
       anchor.add(group);
 
       const bodyMat = new THREE.MeshStandardMaterial({
@@ -466,7 +520,7 @@
     // ---- Playground: a nebula ----
     {
       const group = new THREE.Group();
-      group.position.set(-3.2, -0.6, -2.5);
+      placeObject(group, "playground");
       anchor.add(group);
 
       const NEBULA_COUNT = 260;
@@ -498,7 +552,17 @@
       paintNebulaColors();
 
       const mat = new THREE.PointsMaterial({
-        size: 0.08,
+        // PointsMaterial.size is a world-space measurement that three.js
+        // does NOT run through the object's scale matrix, unlike every
+        // other transform here - so the group scale has to be applied by
+        // hand or the cloud stays a sprinkle of pinpricks after the nebula
+        // grows to 120 units across.
+        size: 0.08 * OBJECT_LAYOUT.playground.scale,
+        // Without a map a point renders as a hard square. That was
+        // invisible while these were sub-pixel specks; at nebula scale
+        // they're tens of units across and read as literal pixel blocks,
+        // so they need the same soft radial falloff the glow sprites use.
+        map: glowTexture,
         vertexColors: true,
         transparent: true,
         opacity: 0.8,
@@ -575,7 +639,7 @@
     // ---- Photography: a distant spiral galaxy ----
     {
       const group = new THREE.Group();
-      group.position.set(-0.8, 2.3, -6.0);
+      placeObject(group, "photography");
       group.rotation.x = THREE.MathUtils.degToRad(58);
       anchor.add(group);
 
@@ -612,7 +676,9 @@
       paintGalaxyColors();
 
       const mat = new THREE.PointsMaterial({
-        size: 0.05,
+        // Hand-applied group scale - see the note on the nebula's cloud.
+        size: 0.05 * OBJECT_LAYOUT.photography.scale,
+        map: glowTexture,
         vertexColors: true,
         transparent: true,
         opacity: 0.85,
@@ -639,24 +705,18 @@
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
 
-      const distance = camera.position.z;
-      const visibleHeight = 2 * distance * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
-      const visibleWidth = visibleHeight * camera.aspect;
-      const screenFraction = w >= 1200 ? 0.6 : 0.55;
-      anchor.position.x = (screenFraction - 0.5) * visibleWidth;
     }
     resize();
     window.addEventListener("resize", resize);
 
     starfield.setAccent(accentColor);
 
-    let autoX = 0;
-    let autoY = 0;
     let tiltX = 0;
     let tiltY = 0;
     let targetTiltX = 0;
     let targetTiltY = 0;
     let clock = 0;
+    let prevCameraZ = camera.position.z;
 
     // ---- Hover/focus choreography: HomeMenu dispatches cosmos:focus /
     // cosmos:blur on document as the user hovers/keyboard-focuses a nav
@@ -666,11 +726,12 @@
     const ALL_KEYS = Object.keys(objects) as CosmosKey[];
     let focusKey: CosmosKey | null = null;
     const dimCurrent: Record<CosmosKey, number> = { about: 1, projects: 1, playground: 1, music: 1, photography: 1, contact: 1 };
-    const idleLookAt = new THREE.Vector3(0, 0, 0);
     const objectWorldPos = new THREE.Vector3();
+    const framedTarget = new THREE.Vector3();
     const cameraRig = createCameraRig(camera, 0.06);
+    // Only used when there are no objects at all (mobile tier): a plain
+    // wide shot of the starfield around the origin.
     const IDLE_CAMERA_Z = 13;
-    const FOCUS_CAMERA_Z = 9.5;
 
     // ---- Homepage spatial journey: scrolling the tall container HomeMenu
     // renders drives a continuous depth value across the same six waypoints
@@ -682,6 +743,13 @@
     // desktop hero (homepage) state: inner "backdrop" pages have no tall
     // scroll container and keep using hover/route framing above unchanged. ----
     const DEPTH_ORDER: CosmosKey[] = ["playground", "projects", "photography", "music", "about", "contact"];
+    // Objects away from the current waypoint fade rather than vanish - this
+    // is the scene's depth haze. Deliberately gentle: distance already
+    // shrinks them to specks, and the far ones (a galaxy hanging behind the
+    // nebula) are the whole reason the vista reads as deep, so dimming them
+    // out of existence would throw away the effect the layout just bought.
+    const DIM_FLOOR = 0.3;
+    const DIM_FALLOFF = 0.35;
     const journeyPointA = new THREE.Vector3();
     const journeyPointB = new THREE.Vector3();
     function journeyActive(): boolean {
@@ -692,22 +760,68 @@
       const max = DEPTH_ORDER.length - 1;
       return THREE.MathUtils.clamp(window.scrollY / vh, 0, max);
     }
-    function journeyLookAt(progress: number, out: THREE.Vector3) {
-      const i0 = Math.floor(progress);
-      const i1 = Math.min(i0 + 1, DEPTH_ORDER.length - 1);
-      const frac = progress - i0;
-      objects[DEPTH_ORDER[i0]]!.getWorldPosition(journeyPointA);
-      objects[DEPTH_ORDER[i1]]!.getWorldPosition(journeyPointB);
-      out.lerpVectors(journeyPointA, journeyPointB, frac);
-    }
-    // Inner pages settle further out than either homepage state: the
-    // object there is ambient dressing behind real content, not a preview
-    // to linger on, so it should read small and quiet, not zoomed-in.
-    const BACKDROP_CAMERA_Z = 16.5;
+    // Inner pages settle further out than the homepage: the object there is
+    // ambient dressing behind real content, not a preview to linger on, so
+    // it should read small and quiet. Expressed as a multiple of the
+    // object's own standoff rather than a fixed z, since "far enough back"
+    // now means something different for a probe than for a galaxy.
+    const BACKDROP_STANDOFF_MULTIPLIER = 1.8;
     let cosmosMode: "hero" | "backdrop" = "hero";
-    function desiredCameraZ(): number {
-      if (cosmosMode === "backdrop") return BACKDROP_CAMERA_Z;
-      return focusKey ? FOCUS_CAMERA_Z : IDLE_CAMERA_Z;
+
+    // How far off-centre to frame the focused object, so it clears the
+    // menu column on the left. Returned in world units at the given
+    // distance, which keeps the on-screen placement constant even as the
+    // standoff swings between 1 and 1050 units across the journey.
+    function framingOffsetX(distance: number): number {
+      const visibleHeight = 2 * distance * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+      const visibleWidth = visibleHeight * camera.aspect;
+      const screenFraction = window.innerWidth >= 1200 ? 0.6 : 0.55;
+      return (screenFraction - 0.5) * visibleWidth;
+    }
+
+    // Writes the framed look-at point into `out` and returns the standoff
+    // the camera should hold. Single source of truth for camera aim, shared
+    // by the animation loop and the instant (reduced-motion) path so the
+    // two can't drift apart.
+    function computeCameraTarget(out: THREE.Vector3): number {
+      let standoff: number;
+      if (journeyActive()) {
+        const progress = journeyDepthProgress();
+        const i0 = Math.floor(progress);
+        const i1 = Math.min(i0 + 1, DEPTH_ORDER.length - 1);
+        const frac = progress - i0;
+        objects[DEPTH_ORDER[i0]]!.getWorldPosition(journeyPointA);
+        objects[DEPTH_ORDER[i1]]!.getWorldPosition(journeyPointB);
+        objectWorldPos.lerpVectors(journeyPointA, journeyPointB, frac);
+        standoff = THREE.MathUtils.lerp(
+          OBJECT_LAYOUT[DEPTH_ORDER[i0]].standoff,
+          OBJECT_LAYOUT[DEPTH_ORDER[i1]].standoff,
+          frac,
+        );
+      } else if (focusKey) {
+        objects[focusKey]!.getWorldPosition(objectWorldPos);
+        standoff = OBJECT_LAYOUT[focusKey].standoff * (cosmosMode === "backdrop" ? BACKDROP_STANDOFF_MULTIPLIER : 1);
+      } else if (isDesktop) {
+        // Homepage with the loop never running (reduced motion): settle on
+        // the first waypoint rather than the origin, which is now empty
+        // space 400 units short of the nearest object.
+        objects[DEPTH_ORDER[0]]!.getWorldPosition(objectWorldPos);
+        standoff = OBJECT_LAYOUT[DEPTH_ORDER[0]].standoff;
+      } else {
+        objectWorldPos.set(0, 0, 0);
+        standoff = IDLE_CAMERA_Z;
+      }
+      // Mouse tilt pans the whole camera rather than only re-aiming it, and
+      // by an amount proportional to the standoff. That's what turns it
+      // into real parallax: the same world-space sway subtends a large
+      // angle for the object being visited and almost nothing for one a
+      // thousand units further out.
+      out.set(
+        objectWorldPos.x - framingOffsetX(standoff) + tiltY * standoff * 0.35,
+        objectWorldPos.y - tiltX * standoff * 0.35,
+        objectWorldPos.z,
+      );
+      return standoff;
     }
 
     if (!reduceMotion) {
@@ -780,14 +894,12 @@
       // approach never happens on its own — snap directly to the settled
       // shot and render exactly one frame, same policy as the idle scene.
       ALL_KEYS.forEach((key) => {
-        dimCurrent[key] = focusKey === null ? 1 : key === focusKey ? 1 : 0.2;
-        objects[key]!.scale.setScalar(0.45 + 0.55 * dimCurrent[key]);
+        dimCurrent[key] = focusKey === null ? 1 : key === focusKey ? 1 : DIM_FLOOR;
       });
-      if (focusKey) {
-        objects[focusKey]!.getWorldPosition(objectWorldPos);
-      }
-      cameraRig.setTarget(focusKey ? objectWorldPos : idleLookAt, desiredCameraZ());
+      const standoff = computeCameraTarget(framedTarget);
+      cameraRig.setTarget(framedTarget, standoff);
       cameraRig.snapToTarget();
+      starfield.group.position.copy(camera.position);
       renderer.render(scene, camera);
     }
     // Fires on the first load and on every subsequent client-side
@@ -799,38 +911,42 @@
       clock += 0.016;
       const inJourney = journeyActive();
       const journeyProgress = inJourney ? journeyDepthProgress() : 0;
-      // Idle drift only reads as "ambient" before the user has committed to
-      // the journey - once they've scrolled even a little, a still-spinning
-      // anchor would fight the guided path, so it freezes there instead.
-      autoY += focusKey || (inJourney && journeyProgress > 0.05) ? 0 : 0.0004;
       tiltX += (targetTiltX - tiltX) * 0.05;
       tiltY += (targetTiltY - tiltY) * 0.05;
-      anchor.rotation.set(autoX + tiltX, autoY + tiltY, 0);
+      // The anchor is no longer rotated. It used to carry a slow idle drift
+      // plus the mouse tilt, which was harmless when every object sat within
+      // 8 units of it - at 8000 units out, a tenth of a radian would sling
+      // the far waypoints hundreds of units across the sky. Tilt now moves
+      // the camera instead (see computeCameraTarget).
 
       ALL_KEYS.forEach((key) => {
         let target: number;
         if (inJourney) {
           const dist = Math.abs(journeyProgress - DEPTH_ORDER.indexOf(key));
-          target = THREE.MathUtils.clamp(1 - dist * 1.1, 0.2, 1);
+          target = THREE.MathUtils.clamp(1 - dist * DIM_FALLOFF, DIM_FLOOR, 1);
         } else {
-          target = focusKey === null ? 1 : key === focusKey ? 1 : 0.2;
+          target = focusKey === null ? 1 : key === focusKey ? 1 : DIM_FLOOR;
         }
         dimCurrent[key] += (target - dimCurrent[key]) * 0.08;
-        objects[key]!.scale.setScalar(0.45 + 0.55 * dimCurrent[key]);
+        // Note: no scale normalization here any more. Apparent size is now
+        // purely a function of true size and distance, which is the entire
+        // point - it's what lets a galaxy read as a galaxy and a probe as a
+        // probe rather than as six equally-sized ornaments.
       });
 
-      if (inJourney) {
-        journeyLookAt(journeyProgress, objectWorldPos);
-        cameraRig.setTarget(objectWorldPos, FOCUS_CAMERA_Z);
-      } else {
-        if (focusKey) {
-          objects[focusKey]!.getWorldPosition(objectWorldPos);
-        }
-        cameraRig.setTarget(focusKey ? objectWorldPos : idleLookAt, desiredCameraZ());
-      }
+      const standoff = computeCameraTarget(framedTarget);
+      cameraRig.setTarget(framedTarget, standoff);
       cameraRig.update();
 
+      // Stars are the one thing that should never fall behind: the camera
+      // travels ~7800 units, far outside the fixed shells they're built on,
+      // so the whole field rides along and surrounds the viewer throughout.
+      starfield.group.position.copy(camera.position);
       starfield.update(0.016, tiltX, tiltY);
+      if (transitDust) {
+        transitDust.update(camera.position.z - prevCameraZ, standoff, camera.position);
+      }
+      prevCameraZ = camera.position.z;
 
       if (isDesktop) {
       const about = objects.about!.userData;
@@ -838,7 +954,7 @@
       about.star.scale.setScalar(starPulse);
       about.coronaInner.material.opacity = (0.5 + Math.sin(clock * 0.9) * 0.1) * dimCurrent.about;
       about.coronaOuter.material.opacity = (0.24 + Math.sin(clock * 0.6 + 1) * 0.06) * dimCurrent.about;
-      about.starMat.emissiveIntensity = 0.15 * (0.35 + 0.65 * dimCurrent.about);
+      about.starMat.emissiveIntensity = 0.9 * (0.35 + 0.65 * dimCurrent.about);
 
       const projects = objects.projects!.userData;
       projects.planetPivots.forEach((pivot: THREE.Group, i: number) => {
