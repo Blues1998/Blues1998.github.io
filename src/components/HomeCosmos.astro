@@ -671,6 +671,35 @@
     const cameraRig = createCameraRig(camera, 0.06);
     const IDLE_CAMERA_Z = 13;
     const FOCUS_CAMERA_Z = 9.5;
+
+    // ---- Homepage spatial journey: scrolling the tall container HomeMenu
+    // renders drives a continuous depth value across the same six waypoints
+    // hover-focus above uses, in the menu's own narrative order, instead of
+    // one-object-at-a-time hover framing. journeyDepthProgress() reads raw
+    // scroll position each frame (no separate easing layer needed - the
+    // cameraRig's own lerp toward whatever target we hand it already
+    // supplies the accelerate/decelerate/settle feel). Confined to the
+    // desktop hero (homepage) state: inner "backdrop" pages have no tall
+    // scroll container and keep using hover/route framing above unchanged. ----
+    const DEPTH_ORDER: CosmosKey[] = ["playground", "projects", "photography", "music", "about", "contact"];
+    const journeyPointA = new THREE.Vector3();
+    const journeyPointB = new THREE.Vector3();
+    function journeyActive(): boolean {
+      return isDesktop && cosmosMode === "hero";
+    }
+    function journeyDepthProgress(): number {
+      const vh = window.innerHeight || 1;
+      const max = DEPTH_ORDER.length - 1;
+      return THREE.MathUtils.clamp(window.scrollY / vh, 0, max);
+    }
+    function journeyLookAt(progress: number, out: THREE.Vector3) {
+      const i0 = Math.floor(progress);
+      const i1 = Math.min(i0 + 1, DEPTH_ORDER.length - 1);
+      const frac = progress - i0;
+      objects[DEPTH_ORDER[i0]]!.getWorldPosition(journeyPointA);
+      objects[DEPTH_ORDER[i1]]!.getWorldPosition(journeyPointB);
+      out.lerpVectors(journeyPointA, journeyPointB, frac);
+    }
     // Inner pages settle further out than either homepage state: the
     // object there is ambient dressing behind real content, not a preview
     // to linger on, so it should read small and quiet, not zoomed-in.
@@ -768,21 +797,37 @@
 
     function animate() {
       clock += 0.016;
-      autoY += focusKey ? 0 : 0.0004;
+      const inJourney = journeyActive();
+      const journeyProgress = inJourney ? journeyDepthProgress() : 0;
+      // Idle drift only reads as "ambient" before the user has committed to
+      // the journey - once they've scrolled even a little, a still-spinning
+      // anchor would fight the guided path, so it freezes there instead.
+      autoY += focusKey || (inJourney && journeyProgress > 0.05) ? 0 : 0.0004;
       tiltX += (targetTiltX - tiltX) * 0.05;
       tiltY += (targetTiltY - tiltY) * 0.05;
       anchor.rotation.set(autoX + tiltX, autoY + tiltY, 0);
 
       ALL_KEYS.forEach((key) => {
-        const target = focusKey === null ? 1 : key === focusKey ? 1 : 0.2;
+        let target: number;
+        if (inJourney) {
+          const dist = Math.abs(journeyProgress - DEPTH_ORDER.indexOf(key));
+          target = THREE.MathUtils.clamp(1 - dist * 1.1, 0.2, 1);
+        } else {
+          target = focusKey === null ? 1 : key === focusKey ? 1 : 0.2;
+        }
         dimCurrent[key] += (target - dimCurrent[key]) * 0.08;
         objects[key]!.scale.setScalar(0.45 + 0.55 * dimCurrent[key]);
       });
 
-      if (focusKey) {
-        objects[focusKey]!.getWorldPosition(objectWorldPos);
+      if (inJourney) {
+        journeyLookAt(journeyProgress, objectWorldPos);
+        cameraRig.setTarget(objectWorldPos, FOCUS_CAMERA_Z);
+      } else {
+        if (focusKey) {
+          objects[focusKey]!.getWorldPosition(objectWorldPos);
+        }
+        cameraRig.setTarget(focusKey ? objectWorldPos : idleLookAt, desiredCameraZ());
       }
-      cameraRig.setTarget(focusKey ? objectWorldPos : idleLookAt, desiredCameraZ());
       cameraRig.update();
 
       starfield.update(0.016, tiltX, tiltY);

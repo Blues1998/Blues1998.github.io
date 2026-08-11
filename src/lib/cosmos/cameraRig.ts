@@ -2,9 +2,12 @@ import * as THREE from "three";
 
 // Small reusable camera-easing abstraction: something wants the camera to
 // look at a point from a given distance, this eases toward it every frame
-// (or snaps instantly, for reduced motion). Deliberately minimal for now -
-// this is the seam Phase 3's scroll-driven camera system plugs into later,
-// not a full waypoint/timeline system yet.
+// (or snaps instantly, for reduced motion). The camera sits `distance`
+// units in front of the look-at point's own world z (not a fixed world z),
+// so as callers hand it look-at points at different depths - e.g. the
+// homepage's scroll-driven journey sweeping across the six cosmos objects -
+// the camera physically dollies through the scene rather than only
+// swivelling to face each one from a constant world position.
 export interface CameraRig {
   setTarget(lookAt: THREE.Vector3, distance: number): void;
   snapToTarget(): void;
@@ -21,7 +24,7 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, defaultEase = 0
   let targetZ = camera.position.z;
 
   function apply() {
-    camera.position.z = currentZ;
+    camera.position.set(0, 0, currentLookAt.z + currentZ);
     camera.lookAt(currentLookAt);
   }
 
