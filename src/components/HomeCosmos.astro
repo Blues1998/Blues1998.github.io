@@ -303,15 +303,24 @@
     // so the flight path weaves instead of running straight down the z
     // axis. An object's own offset doesn't change its framing (the camera
     // centres on it either way); it only moves where its neighbours sit.
+    //
+    // Depth is *not* listed here. It used to be, as six hand-picked z
+    // values, and that was the cause of the journey's worst moment: the
+    // gap from About to Contact was 1000 units of travel toward something
+    // meant to be viewed from three, so for most of that leg the
+    // destination was a fraction of a pixel and the screen was empty. You
+    // could be mid-journey with nothing on screen at all and no way to tell
+    // where you were. Spacing is derived from the objects instead - see
+    // waypointDepth() below.
     const OBJECT_LAYOUT: Record<
       CosmosKey,
-      { z: number; offset: [number, number]; scale: number; frame: number }
+      { offset: [number, number]; scale: number; frame: number }
     > = {
-      playground:  { z: -400,  offset: [0.25, 0.10],   scale: 37.5,  frame: 0.92 }, // nebula
-      projects:    { z: -1400, offset: [-0.20, 0.15],  scale: 8.3,   frame: 0.74 }, // planetary system
-      photography: { z: -4000, offset: [0.15, -0.20],  scale: 187.5, frame: 0.88 }, // galaxy
-      music:       { z: -6000, offset: [-0.40, -0.14], scale: 2.6,   frame: 0.80 }, // pulsar
-      about:       { z: -7000, offset: [0.20, 0.25],   scale: 2.14,  frame: 0.86 }, // star
+      playground:  { offset: [0.25, 0.10],   scale: 37.5,  frame: 0.92 }, // nebula
+      projects:    { offset: [-0.20, 0.15],  scale: 8.3,   frame: 0.74 }, // planetary system
+      photography: { offset: [0.15, -0.20],  scale: 187.5, frame: 0.88 }, // galaxy
+      music:       { offset: [-0.40, -0.14], scale: 2.6,   frame: 0.80 }, // pulsar
+      about:       { offset: [0.20, 0.25],   scale: 2.14,  frame: 0.86 }, // star
       // Over 1 on purpose, and the only one that is. Framing is fitted to
       // an object's bounding box, which assumes the box is a fair proxy for
       // what you look at - true for a nebula or a star, false for a
@@ -319,16 +328,15 @@
       // body it hangs off. Fitting that box put the whole probe at about a
       // quarter of the frame. Letting the boom run past the edges is both
       // better looking and closer to how the thing is actually photographed.
-      contact:     { z: -8000, offset: [-0.17, 0.22],  scale: 1.1,   frame: 1.35 }, // probe
+      contact:     { offset: [-0.17, 0.22],  scale: 1.1,   frame: 1.35 }, // probe
     };
 
     // Built at the origin's x/y and moved into place by placeObjects() once
     // every object has been measured - position doesn't affect an object's
     // own framing, so it can wait until the parking distances are known.
     function placeObject(group: THREE.Group, key: CosmosKey) {
-      const layout = OBJECT_LAYOUT[key];
-      group.position.set(0, 0, layout.z);
-      group.scale.setScalar(layout.scale);
+      group.position.set(0, 0, 0);
+      group.scale.setScalar(OBJECT_LAYOUT[key].scale);
     }
 
     // The six narrative objects are part of the desktop game-menu
@@ -1082,6 +1090,12 @@
     // this object" goes through standoffFor(), so the answer can never
     // drift out of step with the geometry the way six hand-written numbers
     // did.
+
+    // The order the journey visits the six objects in. Declared up here
+    // rather than alongside the rest of the journey code below, because
+    // waypointDepths() needs it and that runs during the first resize().
+    const DEPTH_ORDER: CosmosKey[] = ["playground", "projects", "photography", "music", "about", "contact"];
+
     const objectExtent: Partial<Record<CosmosKey, { x: number; y: number }>> = {};
     const measureBox = new THREE.Box3();
     const measureSize = new THREE.Vector3();
@@ -1122,14 +1136,51 @@
       return Math.max(forHeight, forWidth, camera.near * 2.5);
     }
 
+    // How far apart consecutive waypoints sit. Two terms, because a leg has
+    // two jobs and they scale with different objects:
+    //
+    //   LEG_CLEARANCE * standoff(from)  - room to get clear of the object
+    //     being left, so the camera isn't still inside it when it turns.
+    //   LEG_APPROACH  * standoff(to)    - the run-in, expressed in units of
+    //     how far away the destination wants to be viewed from. This is the
+    //     term that decides whether a leg has anything to look at: at the
+    //     moment you clear the old object, the new one is LEG_APPROACH
+    //     standoffs out, so it already fills roughly 1/LEG_APPROACH of the
+    //     frame it will eventually fill.
+    //
+    // Fixed distances could not do this, and that was the bug: 1000 units is
+    // a stroll between two galaxies and an interstellar void between two
+    // spacecraft, and the old layout used exactly 1000 for both. Averaging
+    // the two standoffs (the first attempt at this) was no better - one big
+    // object at either end swamps the average and strands the small one.
+    const LEG_CLEARANCE = 1.6;
+    const LEG_APPROACH = 6;
+
+    // Waypoint depths, accumulated along the journey order. The first sits
+    // near the origin so the camera's initial position is somewhere sane.
+    const FIRST_WAYPOINT_Z = -400;
+    function waypointDepths(): Record<CosmosKey, number> {
+      const out = {} as Record<CosmosKey, number>;
+      let z = FIRST_WAYPOINT_Z;
+      DEPTH_ORDER.forEach((key, i) => {
+        if (i > 0) {
+          const prev = DEPTH_ORDER[i - 1];
+          z -= LEG_CLEARANCE * standoffFor(prev) + LEG_APPROACH * standoffFor(key);
+        }
+        out[key] = z;
+      });
+      return out;
+    }
+
     // x/y offsets are multiples of the parking distance, so they have to
     // wait until that distance is known. Re-run on resize for the same
     // reason standoffFor() is: aspect changes move the goalposts.
     function placeObjects() {
+      const depths = waypointDepths();
       (Object.keys(objects) as CosmosKey[]).forEach((key) => {
         const layout = OBJECT_LAYOUT[key];
         const standoff = standoffFor(key);
-        objects[key]!.position.set(layout.offset[0] * standoff, layout.offset[1] * standoff, layout.z);
+        objects[key]!.position.set(layout.offset[0] * standoff, layout.offset[1] * standoff, depths[key]);
       });
     }
 
@@ -1177,7 +1228,6 @@
     // one-object-at-a-time hover framing. Confined to the desktop hero
     // (homepage) state: inner "backdrop" pages have no tall scroll
     // container and keep using hover/route framing above unchanged. ----
-    const DEPTH_ORDER: CosmosKey[] = ["playground", "projects", "photography", "music", "about", "contact"];
     // Fraction of each leg's scroll spent held on the waypoint you're
     // leaving and the one you're reaching. Without these the mapping from
     // scroll to depth was linear, which meant the camera was only ever
@@ -1307,14 +1357,48 @@
         objects[warpKey]!.getWorldPosition(objectWorldPos);
         standoff = warpStandoff(warpKey);
       } else if (journeyActive()) {
+        // ---- Travelling between two waypoints ----
+        //
+        // Distance is interpolated *geometrically*, not linearly, and that
+        // is the difference between a leg you can follow and a leg that is
+        // simply empty. Adjacent objects here differ in scale by up to 47x
+        // (a galaxy viewed from 657 units, then a pulsar viewed from 14).
+        // Moving the camera at a constant rate through that means almost
+        // the whole leg is spent too far from the destination to see it and
+        // too far past the origin for that to still be there - which is
+        // exactly the "I have no idea where I am" stretch. No choice of gap
+        // length fixes it, because the problem is the *rate*: linear motion
+        // between two wildly different scales spends its time in the middle,
+        // where by definition nothing is close.
+        //
+        // Halving the remaining distance in equal steps instead - constant
+        // proportional approach, the way distance actually behaves when you
+        // travel toward something - keeps the destination growing steadily
+        // in frame the whole way. It is also just how approach feels: the
+        // last kilometre of a long trip is not the same as the first.
         const progress = journeyDepthProgress();
         const i0 = Math.floor(progress);
         const i1 = Math.min(i0 + 1, DEPTH_ORDER.length - 1);
         const frac = progress - i0;
         objects[DEPTH_ORDER[i0]]!.getWorldPosition(journeyPointA);
         objects[DEPTH_ORDER[i1]]!.getWorldPosition(journeyPointB);
-        objectWorldPos.lerpVectors(journeyPointA, journeyPointB, frac);
-        standoff = THREE.MathUtils.lerp(standoffFor(DEPTH_ORDER[i0]), standoffFor(DEPTH_ORDER[i1]), frac);
+        const standoffA = standoffFor(DEPTH_ORDER[i0]);
+        const standoffB = standoffFor(DEPTH_ORDER[i1]);
+        const gap = journeyPointA.distanceTo(journeyPointB);
+        if (i0 === i1 || gap <= 0) {
+          objectWorldPos.copy(journeyPointA);
+          standoff = standoffA;
+        } else {
+          // Geometric on both terms, so each is a straight line in log space.
+          standoff = Math.exp(THREE.MathUtils.lerp(Math.log(standoffA), Math.log(standoffB), frac));
+          const startDistance = gap + standoffA;
+          const distance = startDistance * Math.pow(standoffB / startDistance, frac);
+          // The camera sits `standoff` in front of the look-at point, so
+          // solve for where the look-at has to be for the camera to end up
+          // `distance` from the destination.
+          const along = THREE.MathUtils.clamp(1 - (distance - standoff) / gap, 0, 1);
+          objectWorldPos.lerpVectors(journeyPointA, journeyPointB, along);
+        }
       } else if (focusKey) {
         objects[focusKey]!.getWorldPosition(objectWorldPos);
         standoff = standoffFor(focusKey) * (cosmosMode === "backdrop" ? BACKDROP_STANDOFF_MULTIPLIER : 1);
@@ -1510,6 +1594,10 @@
       clock += 0.016;
       const inJourney = journeyActive();
       const journeyProgress = inJourney ? journeyDepthProgress() : 0;
+      // The pair of waypoints the current leg runs between - the only two
+      // objects that are ever deliberately being looked at mid-journey.
+      const journeyFrom = Math.floor(journeyProgress);
+      const journeyTo = Math.min(journeyFrom + 1, DEPTH_ORDER.length - 1);
       tiltX += (targetTiltX - tiltX) * 0.05;
       tiltY += (targetTiltY - tiltY) * 0.05;
       // The anchor is no longer rotated. It used to carry a slow idle drift
@@ -1541,10 +1629,20 @@
         // point galaxy. Keyed off real projected size rather than a fixed
         // distance, since "far" means something different for each of them.
         const group = objects[key]!;
+        // Never cull what you are travelling to or from, however small it
+        // currently is. The threshold below is about not paying for specks,
+        // but the destination of a leg *starts* as a speck - hiding it
+        // outright is what turned the long approach to Contact into an
+        // empty screen instead of a distant object growing closer.
+        const isActive =
+          key === warpKey ||
+          key === focusKey ||
+          (inJourney && (key === DEPTH_ORDER[journeyFrom] || key === DEPTH_ORDER[journeyTo]));
         group.getWorldPosition(cullWorldPos);
         const distance = cullWorldPos.distanceTo(camera.position);
         const extent = objectExtent[key];
-        group.visible = !extent || distance <= 0 || extent.y / distance > CULL_ANGULAR_SIZE;
+        group.visible =
+          isActive || !extent || distance <= 0 || extent.y / distance > CULL_ANGULAR_SIZE;
       });
 
       const standoff = computeCameraTarget(framedTarget);
