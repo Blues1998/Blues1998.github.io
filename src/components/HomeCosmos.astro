@@ -402,131 +402,543 @@
       objects.about = group;
     }
 
-    // ---- Projects: a small planetary system ----
+    // ---- Projects: the solar system ----
+    // Built from published orbital elements rather than eyeballed rings.
+    // What was here before was three tinted spheres on three separately
+    // tilted hoops with a scanned asteroid standing in at Mercury's orbit,
+    // and it read exactly as what it was: a diagram of a solar system by
+    // someone who hadn't looked one up.
+    //
+    // Two quantities have to be compressed, and they can't both be honest.
+    // Jupiter's radius is 1/85,000th of Pluto's orbit, so *any* drawing of
+    // this at any size already misstates size against distance by four
+    // orders of magnitude. The only real question is how that unavoidable
+    // lie is distributed, so it's spent deliberately, in two places, and
+    // nowhere else:
+    //
+    //   orbit radius - logarithmic in the true semi-major axis. Keeps the
+    //     true ordering and the true shape of the spacing; Jupiter still
+    //     opens by far the widest gap in the system, because it really does.
+    //   body radius  - true radius to the power 0.6. Sizing the bodies
+    //     truly against each other puts Mercury at 2px and Pluto under 1px
+    //     beside a 40px Jupiter: correct, and unreadable. The 0.6 exponent
+    //     keeps Jupiter unmistakably the giant (4x Earth here against 11x
+    //     in life) while leaving every body big enough to show its own face.
+    //
+    // Everything else is real and uncompressed: eccentricity, inclination,
+    // ascending node, argument of perihelion, axial tilt, spin direction,
+    // ring geometry, and where all eleven bodies are standing right now.
     {
       const group = new THREE.Group();
       placeObject(group, "projects");
+      // Tip the ecliptic toward the viewer. Everything below builds the
+      // system in its own plane, which puts the plane exactly edge-on to a
+      // camera looking down -Z - nine planets and their orbits collapsed
+      // onto one horizontal line, which is both unreadable and, since
+      // Saturn's rings vanish to a stroke at that angle, a waste of the one
+      // fix this waypoint most needed. 25 degrees is enough to open the
+      // orbits into ellipses and show the rings as rings.
+      group.rotation.x = 0.44;
       anchor.add(group);
 
-      // The system's own star. Warm and small rather than the muted grey
-      // smudge this was - a planetary system whose centre is a grey haze
-      // reads as an unfinished diagram, and the planets are lit from
-      // somewhere, so something should be there emitting.
-      const hubStar = new THREE.Mesh(
-        new THREE.SphereGeometry(0.075, 32, 24),
-        new THREE.MeshBasicMaterial({ color: 0xfff4e0 }),
-      );
-      const hubGlow = makeGlowSprite(0.42, 0.75, new THREE.Color(0xffe7bd), null);
-      const hubHalo = makeGlowSprite(0.95, 0.3, new THREE.Color(0xffd9a0), null);
-      group.add(hubStar, hubGlow, hubHalo);
+      const DEG = Math.PI / 180;
 
-      const planetDefs: { radius: number; size: number; tiltXDeg: number; speed: number; color: THREE.Color; ring: boolean; texture: string; ringTexture?: string }[] = [
-        { radius: 0.55, size: 0.07, tiltXDeg: 62, speed: 0.02, color: accentColor, ring: false, texture: "mars-2k.jpg" },
-        { radius: 0.95, size: 0.1, tiltXDeg: 70, speed: 0.013, color: mutedColor, ring: true, texture: "saturn-2k.jpg", ringTexture: "saturn-ring-2k.png" },
-        { radius: 1.35, size: 0.06, tiltXDeg: 66, speed: 0.009, color: accentColor, ring: false, texture: "neptune-2k.jpg" },
+      const ORBIT_INNER = 0.34; // Mercury
+      const ORBIT_OUTER = 1.6; // Pluto
+      const LOG_INNER = Math.log(0.3871);
+      const LOG_SPAN = Math.log(39.4817) - LOG_INNER;
+      function orbitRadius(au: number): number {
+        return Math.max(0.05, ORBIT_INNER + ((Math.log(au) - LOG_INNER) / LOG_SPAN) * (ORBIT_OUTER - ORBIT_INNER));
+      }
+
+      const JUPITER_KM = 69911;
+      const JUPITER_DRAWN = 0.105;
+      function bodyRadius(km: number): number {
+        return JUPITER_DRAWN * Math.pow(km / JUPITER_KM, 0.6);
+      }
+
+      // Kepler's third law, applied to the radii actually drawn instead of
+      // the real ones. Real period ratios across a compressed system leave
+      // the outer half of it frozen - 248 years for Pluto against 88 days
+      // for Mercury - so the drawn system instead obeys the law its own
+      // geometry implies. Closer is still faster, still by exactly a^-3/2,
+      // just over a shorter range.
+      const INNER_PERIOD_S = 14;
+      function meanMotion(a: number): number {
+        return (Math.PI * 2) / (INNER_PERIOD_S * Math.pow(a / ORBIT_INNER, 1.5));
+      }
+
+      // Spin gets the same treatment for the same reason: at true ratios an
+      // Earth day would pass in 0.09s and Venus would need 16 minutes.
+      const EARTH_DAY_S = 4;
+      function spinRate(hours: number): number {
+        return (Math.PI * 2) / (EARTH_DAY_S * (hours / 23.934));
+      }
+
+      // Mean anomaly is the J2000 value from JPL's fact sheets, wound
+      // forward to now at each body's *real* period. So the arrangement you
+      // arrive on is the arrangement outside, today - Jupiter is where
+      // Jupiter is. From that instant it runs on drawn time and the
+      // agreement decays; it's a starting condition, not a claim.
+      const daysSinceJ2000 = (Date.now() - Date.UTC(2000, 0, 1, 12)) / 86400000;
+
+      // Perifocal basis: P points at perihelion, Q is a quarter turn ahead
+      // in the orbit plane, and a position is just a(cosE - e)*P +
+      // a*sqrt(1-e^2)*sinE*Q. Cheaper than three nested rotation nodes per
+      // body and, more to the point, it's one expression used by both the
+      // per-frame position and the orbit line, so the drawn ellipse cannot
+      // drift out of agreement with the body travelling along it.
+      // Ecliptic coordinates come out z-north and are handed to three.js
+      // y-up on the way: (x, y, z) -> (x, z, -y).
+      function perifocal(inc: number, node: number, peri: number) {
+        const ci = Math.cos(inc * DEG), si = Math.sin(inc * DEG);
+        const cO = Math.cos(node * DEG), sO = Math.sin(node * DEG);
+        const cw = Math.cos(peri * DEG), sw = Math.sin(peri * DEG);
+        return {
+          P: new THREE.Vector3(cO * cw - sO * sw * ci, sw * si, -(sO * cw + cO * sw * ci)),
+          Q: new THREE.Vector3(-cO * sw - sO * cw * ci, cw * si, -(-sO * sw + cO * cw * ci)),
+        };
+      }
+
+      // M = E - e*sinE, by Newton. Seeded the standard way for high
+      // eccentricity and step-capped, because Halley's e is 0.967 and the
+      // textbook E0 = M start diverges outright up there.
+      function eccentricAnomaly(m: number, e: number): number {
+        let E = m + 0.85 * e * Math.sign(Math.sin(m) || 1);
+        for (let k = 0; k < 24; k++) {
+          const f = E - e * Math.sin(E) - m;
+          if (Math.abs(f) < 1e-9) break;
+          E -= THREE.MathUtils.clamp(f / Math.max(1 - e * Math.cos(E), 1e-4), -1, 1);
+        }
+        return E;
+      }
+
+      type Orbit = { au: number; e: number; bau: number; P: THREE.Vector3; Q: THREE.Vector3; n: number; m: number };
+      function makeOrbit(au: number, e: number, inc: number, node: number, peri: number, m0: number, periodDays: number): Orbit {
+        const { P, Q } = perifocal(inc, node, peri);
+        return {
+          au,
+          e,
+          bau: au * Math.sqrt(1 - e * e),
+          P,
+          Q,
+          n: meanMotion(orbitRadius(au)),
+          m: (m0 * DEG + (Math.PI * 2 * daysSinceJ2000) / periodDays) % (Math.PI * 2),
+        };
+      }
+
+      // The true position, in AU, pulled in along its own radius by the same
+      // logarithmic compression the orbit radii use.
+      //
+      // Compressing the semi-major axis and then drawing a true-shaped
+      // ellipse around it - the obvious way, and the first way this was
+      // written - does not survive eccentricity, because the compression is
+      // nonlinear and an ellipse's shape is not. It put Halley's perihelion
+      // at 0.045 units, which is to say inside the drawn Sun, and Pluto's
+      // 20% deeper under Neptune than it really goes. Compressing the radius
+      // instead keeps every body's distance from the Sun honest at every
+      // point of its orbit, and its direction exactly right; the price is
+      // that the drawn path is a warped ellipse rather than an exact one.
+      // Between the shape of the curve and the distances along it, the
+      // distances are the thing worth getting right.
+      function orbitPoint(o: Orbit, E: number, out: THREE.Vector3): THREE.Vector3 {
+        out
+          .copy(o.P)
+          .multiplyScalar(o.au * (Math.cos(E) - o.e))
+          .addScaledVector(o.Q, o.bau * Math.sin(E));
+        const r = out.length();
+        return r > 1e-9 ? out.multiplyScalar(orbitRadius(r) / r) : out;
+      }
+
+      // One faint ellipse per body, sampled from the same orbitPoint() the
+      // body itself is positioned by. Additive so it can fade to nothing at
+      // the ends instead of to a visible black line.
+      const orbitPointTmp = new THREE.Vector3();
+      function makeOrbitLine(o: Orbit, color: THREE.Color, opacity: number): THREE.Line {
+        const segments = 160;
+        const positions = new Float32Array((segments + 1) * 3);
+        for (let i = 0; i <= segments; i++) {
+          orbitPoint(o, (i / segments) * Math.PI * 2, orbitPointTmp);
+          orbitPointTmp.toArray(positions, i * 3);
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+        return new THREE.Line(
+          geo,
+          new THREE.LineBasicMaterial({ color, transparent: true, opacity, ...ADDITIVE_RGB_ONLY, depthWrite: false }),
+        );
+      }
+
+      // The Sun. Same texture as the About waypoint's star, which is the
+      // point: arriving at Projects and finding the object from About at the
+      // centre of it is how the two waypoints admit they are the same kind
+      // of thing seen from different distances.
+      //
+      // Drawn to neither of this scene's two rules and there is no honest
+      // way around that. True to the orbits it would be 0.004 units across,
+      // smaller than Mercury; true to the size curve it would be 0.42, wider
+      // than Mercury's whole orbit. Both are absurd, so this is a chosen
+      // number, and it is the only one in the block.
+      const SUN_DRAWN = 0.13;
+      const sunMat = new THREE.MeshBasicMaterial({ map: loadCosmosTexture("sun-2k.jpg") });
+      const sun = new THREE.Mesh(new THREE.SphereGeometry(SUN_DRAWN, 48, 32), sunMat);
+      group.add(sun);
+      // Kept tight. Mercury's orbit is only 2.6 solar radii out at this
+      // compression, so a corona sized like the one at the About waypoint -
+      // where the star is alone and can afford to bloom - reaches past the
+      // four inner planets and washes them out of their own system.
+      const sunGlow = makeGlowSprite(SUN_DRAWN * 3.2, 0.5, new THREE.Color(0xffe7bd), null);
+      const sunHalo = makeGlowSprite(SUN_DRAWN * 6.5, 0.15, new THREE.Color(0xffd9a0), null);
+      group.add(sunGlow, sunHalo);
+
+      // Illumination from the system's own star, which the scene did not
+      // have before: the shared key/rim pair is directional, so every planet
+      // was lit from the same corner of the sky no matter where its sun
+      // was, and the phases were nonsense.
+      //
+      // decay 0 is deliberate. True inverse-square across 0.39 to 39 AU is
+      // 10,000:1 - physically exact, and it would leave everything past
+      // Jupiter unlit. The distance cap is what keeps this local: the next
+      // nearest object in the scene is thousands of units away, so nothing
+      // else can be touched by it.
+      const sunLight = new THREE.PointLight(0xfff2e0, 4, 34, 0);
+      group.add(sunLight);
+
+      type Ring = { inner: number; outer: number; texture?: string; opacity: number };
+      type Body = {
+        name: string;
+        texture: string;
+        tint: number;
+        km: number;
+        obliquity: number; // degrees from the orbit normal
+        dayHours: number; // sidereal, negative = retrograde spin
+        au: number;
+        e: number;
+        inc: number; // degrees to the ecliptic
+        node: number; // longitude of ascending node
+        peri: number; // argument of perihelion
+        m0: number; // mean anomaly at J2000
+        periodDays: number;
+        ring?: Ring; // radii in planet radii
+      };
+
+      // J2000 elements from JPL's planetary fact sheets; radii, obliquities
+      // and rotation periods likewise. Venus, Uranus and Pluto spin
+      // backwards and say so in the sign.
+      const BODIES: Body[] = [
+        { name: "Mercury", texture: "mercury-1k.jpg", tint: 0xffffff, km: 2440, obliquity: 0.03, dayHours: 1407.6,
+          au: 0.38710, e: 0.20563, inc: 7.005, node: 48.331, peri: 29.125, m0: 174.796, periodDays: 87.969 },
+        { name: "Venus", texture: "venus-1k.jpg", tint: 0xffffff, km: 6052, obliquity: 177.36, dayHours: -5832.5,
+          au: 0.72333, e: 0.00677, inc: 3.395, node: 76.680, peri: 54.884, m0: 50.115, periodDays: 224.701 },
+        { name: "Earth", texture: "earth-1k.jpg", tint: 0xffffff, km: 6371, obliquity: 23.44, dayHours: 23.934,
+          au: 1.00000, e: 0.01671, inc: 0.000, node: -11.261, peri: 114.208, m0: 358.617, periodDays: 365.256 },
+        { name: "Mars", texture: "mars-1k.jpg", tint: 0xffffff, km: 3390, obliquity: 25.19, dayHours: 24.623,
+          au: 1.52368, e: 0.09340, inc: 1.850, node: 49.558, peri: 286.502, m0: 19.373, periodDays: 686.980 },
+        { name: "Jupiter", texture: "jupiter-1k.jpg", tint: 0xffffff, km: 69911, obliquity: 3.13, dayHours: 9.925,
+          au: 5.20260, e: 0.04849, inc: 1.303, node: 100.464, peri: 273.867, m0: 20.020, periodDays: 4332.589 },
+        // Ring radii are the real C-through-A span, 1.24 to 2.27 Saturn
+        // radii, which is what the texture strip covers.
+        { name: "Saturn", texture: "saturn-1k.jpg", tint: 0xffffff, km: 58232, obliquity: 26.73, dayHours: 10.656,
+          au: 9.55491, e: 0.05551, inc: 2.485, node: 113.665, peri: 339.392, m0: 317.020, periodDays: 10759.22,
+          ring: { inner: 1.24, outer: 2.27, texture: "saturn-ring-2k.png", opacity: 0.95 } },
+        // Uranus has rings too - narrow, dark, and standing almost straight
+        // up because the planet is knocked over 98 degrees. Untextured and
+        // barely there on purpose: that is how they are.
+        { name: "Uranus", texture: "uranus-1k.jpg", tint: 0xffffff, km: 25362, obliquity: 97.77, dayHours: -17.24,
+          au: 19.21845, e: 0.04630, inc: 0.773, node: 74.006, peri: 96.999, m0: 142.239, periodDays: 30685.4,
+          ring: { inner: 1.64, outer: 2.0, opacity: 0.18 } },
+        { name: "Neptune", texture: "neptune-1k.jpg", tint: 0xffffff, km: 24622, obliquity: 28.32, dayHours: 16.11,
+          au: 30.11039, e: 0.00899, inc: 1.770, node: 131.784, peri: 276.336, m0: 256.228, periodDays: 60189 },
+        // The greyscale New Horizons albedo map times Pluto's mean colour -
+        // see the note in public/textures/cosmos/License.txt. The 17-degree
+        // inclination and 0.249 eccentricity are the reason Pluto is worth
+        // drawing: it leans out of the plane everything else lies in, and
+        // its perihelion falls inside Neptune's orbit. Both are visible here.
+        { name: "Pluto", texture: "pluto-1k.jpg", tint: 0xc9a888, km: 1188, obliquity: 122.53, dayHours: -153.29,
+          au: 39.48169, e: 0.24883, inc: 17.16, node: 110.299, peri: 113.834, m0: 14.53, periodDays: 90560 },
       ];
+
       // RingGeometry's default UVs run along vertex position, not polar
-      // radius, so a radial-gradient ring texture (like Saturn's, a thin
-      // strip encoding inner-to-outer banding) samples wrong out of the box.
-      // Remap so U tracks the 0..1 fraction from inner to outer radius.
+      // radius, so a ring texture that encodes inner-to-outer banding as a
+      // thin strip - which is exactly what Saturn's is - samples wrong out
+      // of the box. Remap so U tracks the 0..1 fraction from inner to outer.
       function remapRingUVs(geometry: THREE.RingGeometry, innerRadius: number, outerRadius: number) {
         const pos = geometry.attributes.position;
         const uv = geometry.attributes.uv;
         const v3 = new THREE.Vector3();
         for (let i = 0; i < pos.count; i++) {
           v3.fromBufferAttribute(pos, i);
-          const t = (v3.length() - innerRadius) / (outerRadius - innerRadius);
-          uv.setXY(i, t, 0.5);
+          uv.setXY(i, THREE.MathUtils.clamp((v3.length() - innerRadius) / (outerRadius - innerRadius), 0, 1), 0.5);
         }
         uv.needsUpdate = true;
       }
-      const planetPivots: THREE.Group[] = [];
-      planetDefs.forEach((def, i) => {
-        const pivot = new THREE.Group();
-        pivot.rotation.x = THREE.MathUtils.degToRad(def.tiltXDeg);
-        pivot.rotation.z = (i / planetDefs.length) * Math.PI * 2;
-        group.add(pivot);
 
-        const planetMat = new THREE.MeshStandardMaterial({
-          map: loadCosmosTexture(def.texture),
-          color: 0xffffff,
-          emissive: def.color,
-          emissiveIntensity: 0.1,
-          roughness: 0.5,
-          metalness: 0.1,
+      const sphereGeo = new THREE.SphereGeometry(1, 32, 24);
+      const planets: { orbit: Orbit; holder: THREE.Object3D; spinner: THREE.Object3D; spin: number }[] = [];
+      const orbitLineMats: THREE.LineBasicMaterial[] = [];
+
+      BODIES.forEach((body) => {
+        const orbit = makeOrbit(body.au, body.e, body.inc, body.node, body.peri, body.m0, body.periodDays);
+        const radius = bodyRadius(body.km);
+
+        const holder = new THREE.Object3D();
+        group.add(holder);
+
+        // Axial tilt lives on its own node between the orbit and the body,
+        // so the planet spins about its own pole rather than the orbit
+        // normal - and so anything in the planet's equatorial plane can hang
+        // off the same node and inherit the tilt for free. Which is the
+        // whole fix for Saturn: its rings used to be a separate rotation
+        // bolted onto a separately tilted orbit hoop, and wobbled around at
+        // an angle that belonged to neither the planet nor the ecliptic.
+        // They are in the equatorial plane now, because that is where they
+        // are.
+        const tilt = new THREE.Object3D();
+        tilt.rotation.z = body.obliquity * DEG;
+        holder.add(tilt);
+
+        const mat = new THREE.MeshStandardMaterial({
+          map: loadCosmosTexture(body.texture),
+          color: body.tint,
+          roughness: 0.85,
+          metalness: 0,
         });
-        const planet = new THREE.Mesh(new THREE.SphereGeometry(def.size, 14, 14), planetMat);
-        planet.position.x = def.radius;
-        pivot.add(planet);
+        const mesh = new THREE.Mesh(sphereGeo, mat);
+        mesh.scale.setScalar(radius);
+        tilt.add(mesh);
 
-        const targets = def.color === mutedColor ? mutedTargets : accentTargets;
-        targets.push(planetMat.emissive);
-
-        if (def.ring) {
-          const innerR = def.size * 1.5;
-          const outerR = def.size * 2.1;
-          const ringGeo = new THREE.RingGeometry(innerR, outerR, 48);
-          remapRingUVs(ringGeo, innerR, outerR);
-          const ringMat = new THREE.MeshBasicMaterial({
-            map: def.ringTexture ? loadCosmosTexture(def.ringTexture) : null,
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0.9,
-            side: THREE.DoubleSide,
-          });
-          const ring = new THREE.Mesh(ringGeo, ringMat);
-          ring.position.x = def.radius;
-          ring.rotation.x = Math.PI / 2.3;
-          pivot.add(ring);
+        if (body.ring) {
+          const inner = radius * body.ring.inner;
+          const outer = radius * body.ring.outer;
+          const ringGeo = new THREE.RingGeometry(inner, outer, 96);
+          remapRingUVs(ringGeo, inner, outer);
+          const ring = new THREE.Mesh(
+            ringGeo,
+            new THREE.MeshBasicMaterial({
+              map: body.ring.texture ? loadCosmosTexture(body.ring.texture) : null,
+              color: 0xffffff,
+              transparent: true,
+              opacity: body.ring.opacity,
+              side: THREE.DoubleSide,
+              depthWrite: false,
+            }),
+          );
+          // RingGeometry is built in the XY plane; the equator is XZ.
+          ring.rotation.x = -Math.PI / 2;
+          tilt.add(ring);
         }
 
-        const orbitLineMat = new THREE.MeshBasicMaterial({ color: def.color, transparent: true, opacity: 0.18 });
-        const orbitLine = new THREE.Mesh(new THREE.TorusGeometry(def.radius, 0.005, 6, 96), orbitLineMat);
-        pivot.add(orbitLine);
-        targets.push(orbitLineMat.color);
+        const line = makeOrbitLine(orbit, mutedColor, 0.5);
+        group.add(line);
+        orbitLineMats.push(line.material as THREE.LineBasicMaterial);
 
-        planetPivots.push(pivot);
+        planets.push({ orbit, holder, spinner: mesh, spin: spinRate(body.dayHours) });
       });
 
-      // Asteroid: a genuinely irregular scanned shape (not a sphere
-      // pretending), orbiting closer in than the real planets. Tumbles on
-      // its own axes each frame rather than sharing the planets' fixed
-      // orbit-plane tilt - real asteroids have no settled "up".
-      const ASTEROID_RADIUS = 0.32;
-      const ASTEROID_SPEED = 0.028;
-      const asteroidPivot = new THREE.Group();
-      asteroidPivot.rotation.x = THREE.MathUtils.degToRad(58);
-      group.add(asteroidPivot);
+      // Itokawa, on Itokawa's actual orbit. It used to sit at the innermost
+      // slot standing in for a planet, where a 500-metre rubble pile read as
+      // a deformed Mercury - the one thing in the scene that was real
+      // geometry, and it was the thing that looked fake. Its real orbit
+      // crosses Earth's, which is both more interesting and less work.
+      const itokawaOrbit = makeOrbit(1.324163, 0.28011, 1.6214, 69.081, 162.820, 294.3, 556.4);
+      const itokawaHolder = new THREE.Object3D();
+      group.add(itokawaHolder);
+      group.add(makeOrbitLine(itokawaOrbit, mutedColor, 0.28));
       gltfLoader.load(
         `${cosmosAssetBase}models/cosmos/itokawa.glb`,
         (gltf: any) => {
           const mesh = gltf.scene;
           const box = new THREE.Box3().setFromObject(mesh);
           const size = box.getSize(new THREE.Vector3()).length();
-          mesh.scale.setScalar(0.11 / (size || 1));
-          mesh.position.x = ASTEROID_RADIUS;
-          // NASA's shape-model export carries a bare white/metallic PBR
+          // Real relative size would be a third of a pixel. Drawn at roughly
+          // Pluto's size so the shape - which is the entire reason it is
+          // here rather than another sphere - can be seen at all.
+          mesh.scale.setScalar(0.02 / (size || 1));
+          // NASA's shape-model export carries a bare white metallic PBR
           // material with no environment map to reflect, so it renders
-          // near-black against the scene's point lights alone - overridden
-          // with a matte rock tint so the real scanned shape actually reads.
+          // near-black under the scene's lights alone. Overridden with a
+          // matte rock tint so the real scanned geometry actually reads.
           mesh.traverse((child: any) => {
             if (child.isMesh) {
               child.material = new THREE.MeshStandardMaterial({ color: 0x8a7c6e, roughness: 0.95, metalness: 0 });
             }
           });
-          asteroidPivot.add(mesh);
-          asteroidPivot.userData.mesh = mesh;
+          itokawaHolder.add(mesh);
+          itokawaHolder.userData.mesh = mesh;
           refreshFraming("projects");
         },
         undefined,
         (err: unknown) => console.error(LOG, "Failed to load asteroid model", err),
       );
-      const asteroidOrbitMat = new THREE.MeshBasicMaterial({ color: mutedColor, transparent: true, opacity: 0.18 });
-      const asteroidOrbitLine = new THREE.Mesh(new THREE.TorusGeometry(ASTEROID_RADIUS, 0.005, 6, 96), asteroidOrbitMat);
-      asteroidPivot.add(asteroidOrbitLine);
-      mutedTargets.push(asteroidOrbitMat.color);
 
-      group.userData = { planetPivots, planetDefs, asteroidPivot, asteroidSpeed: ASTEROID_SPEED };
+      // ---- 1P/Halley ----
+      // Real elements, and they are the whole joke: e = 0.967 and an
+      // inclination of 162 degrees, so it goes round the Sun *backwards*,
+      // against the direction all nine of the others travel, on a path tipped
+      // most of the way over from the plane they share. Aphelion falls just
+      // inside Pluto's orbit and it spends almost the entire lap out there
+      // barely moving - Kepler's second law is unkind to comets - then drops
+      // through the middle of the system in a few seconds with both tails up
+      // and climbs back out.
+      //
+      // No orbit line, unlike every other body here. A permanently drawn
+      // path would announce it in advance, and the thing about a comet is
+      // that it shows up.
+      const halleyOrbit = makeOrbit(17.834, 0.96714, 162.262, 58.42, 111.33, 66.4, 27512);
+      const halley = new THREE.Object3D();
+      // Kept out of the framing fit - see expandExtent(). A 162-degree
+      // inclination throws it far enough out of the shared plane that
+      // fitting the frame around it would shrink the entire solar system to
+      // leave room for one body that is invisible most of the time anyway.
+      halley.userData.noExtent = true;
+      group.add(halley);
+
+      const comaMat = new THREE.SpriteMaterial({
+        map: glowTexture,
+        color: new THREE.Color(0xdff0ff),
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        ...ADDITIVE_RGB_ONLY,
+      });
+      const coma = new THREE.Sprite(comaMat);
+      coma.scale.setScalar(0.05);
+      halley.add(coma);
+
+      // Two tails, because a comet has two and they point in different
+      // directions - which is the detail that makes one read as a comet
+      // rather than a smear. The ion tail is gas, blown dead anti-sunward by
+      // the solar wind, narrow and blue. The dust tail is heavier, keeps
+      // some of the comet's own orbital motion, and so lags behind along the
+      // path and spreads wider, and is warmer because it is lit by reflected
+      // sunlight rather than glowing on its own.
+      //
+      // Built from a chain of overlapping soft sprites rather than the
+      // obvious tapered cone. A cone is a shell: every vertex is on the
+      // silhouette, so there is no interior to make brighter than the edge,
+      // and it renders as a hard-edged triangular wedge with a crisp
+      // boundary against space. A comet tail has no boundary. Sprites are
+      // soft in both directions at once and cost nothing at this count.
+      type Tail = { holder: THREE.Object3D; mats: THREE.SpriteMaterial[]; weights: number[] };
+      function makeTail(count: number, length: number, spread: number, color: number, falloff: number): Tail {
+        const holder = new THREE.Object3D();
+        const mats: THREE.SpriteMaterial[] = [];
+        const weights: number[] = [];
+        for (let i = 0; i < count; i++) {
+          const t = (i + 0.5) / count;
+          const mat = new THREE.SpriteMaterial({
+            map: glowTexture,
+            color: new THREE.Color(color),
+            transparent: true,
+            opacity: 0,
+            depthWrite: false,
+            ...ADDITIVE_RGB_ONLY,
+          });
+          const sprite = new THREE.Sprite(mat);
+          // Hangs off the nucleus down its own -Y; the holder is what gets
+          // pointed anti-sunward each frame.
+          sprite.position.y = -t * length;
+          // Each sprite has to be several times wider than the gap to the
+          // next one or the chain reads as a dotted line rather than a
+          // plume - the glow texture falls off well before its own edge, so
+          // "touching" is not enough, they have to genuinely overlap.
+          sprite.scale.setScalar(0.05 + t * spread);
+          holder.add(sprite);
+          mats.push(mat);
+          weights.push(Math.pow(1 - t, falloff));
+        }
+        return { holder, mats, weights };
+      }
+      function setTailStrength(tail: Tail, strength: number) {
+        for (let i = 0; i < tail.mats.length; i++) tail.mats[i].opacity = strength * tail.weights[i];
+      }
+      const ionTail = makeTail(44, 0.78, 0.055, 0xa8d4ff, 1.4);
+      const dustTail = makeTail(30, 0.46, 0.12, 0xffd9a8, 1.9);
+      halley.add(ionTail.holder, dustTail.holder);
+
+      const prevHalley = new THREE.Vector3();
+      const sunward = new THREE.Vector3();
+      const trailing = new THREE.Vector3();
+      const TAIL_AXIS = new THREE.Vector3(0, -1, 0);
+      let halleySeeded = false;
+
+      function advance(o: Orbit, dt: number): number {
+        o.m = (o.m + o.n * dt) % (Math.PI * 2);
+        return eccentricAnomaly(o.m, o.e);
+      }
+
+      group.userData = {
+        update(dt: number, dim: number) {
+          sun.rotation.y += spinRate(609.12) * dt; // the Sun turns once in ~25.4 days
+          sunGlow.material.opacity = 0.5 * dim;
+          sunHalo.material.opacity = 0.15 * dim;
+          orbitLineMats.forEach((m) => { m.opacity = 0.5 * dim; });
+
+          planets.forEach((p) => {
+            orbitPoint(p.orbit, advance(p.orbit, dt), p.holder.position);
+            p.spinner.rotation.y += p.spin * dt;
+          });
+
+          orbitPoint(itokawaOrbit, advance(itokawaOrbit, dt), itokawaHolder.position);
+          const rock = itokawaHolder.userData.mesh as THREE.Object3D | undefined;
+          if (rock) {
+            // A tumble on two axes rather than a spin on one. Itokawa is a
+            // contact binary held together by its own weak gravity; it has
+            // no settled pole to spin about.
+            rock.rotation.x += 0.5 * dt;
+            rock.rotation.y += 0.8 * dt;
+          }
+
+          prevHalley.copy(halley.position);
+          orbitPoint(halleyOrbit, advance(halleyOrbit, dt), halley.position);
+          if (!halleySeeded) {
+            prevHalley.copy(halley.position);
+            halleySeeded = true;
+          }
+
+          // Two thresholds rather than one, matching what is actually
+          // observable. On the way in it is a bare point of light, and that
+          // is all it is for most of the run. The tails only grow once it is
+          // inside roughly Jupiter's distance, which is about where there is
+          // enough sunlight to boil ice off it, and they are at full length
+          // for a few seconds around perihelion - which for Halley falls
+          // between Mercury's orbit and Venus's.
+          //
+          // The tail window is short and there is no honest way to make it
+          // long: e = 0.967 means Kepler's second law spends the lap out at
+          // aphelion and crosses the whole inner system in a few seconds.
+          // So the coma carries the visible run instead - a bright point
+          // sweeping in from past Neptune and back out over about 25 of the
+          // 115 seconds - and the tails are the few seconds in the middle of
+          // it that are worth catching. 7.6 AU for tail onset is late enough
+          // to be true (Halley was recovered showing activity further out
+          // than that in 1982) and early enough to be seen.
+          const r = halley.position.length();
+          const seen = 1 - THREE.MathUtils.smoothstep(r, 0.8, 1.5);
+          const active = 1 - THREE.MathUtils.smoothstep(r, 0.45, 1.15);
+          comaMat.opacity = (0.35 + active * 0.5) * seen * dim;
+          coma.scale.setScalar(0.035 + active * 0.055);
+
+          if (active > 0.001) {
+            sunward.copy(halley.position).normalize();
+            ionTail.holder.quaternion.setFromUnitVectors(TAIL_AXIS, sunward);
+            // The dust tail's lag: mostly anti-sunward, partly back along
+            // the path just travelled. Real dust tails curve because the
+            // grains stay on their own orbits after release rather than
+            // being swept straight out; this is that, to one term.
+            trailing.copy(prevHalley).sub(halley.position);
+            if (trailing.lengthSq() > 1e-12) {
+              trailing.normalize().multiplyScalar(0.9).add(sunward).normalize();
+              dustTail.holder.quaternion.setFromUnitVectors(TAIL_AXIS, trailing);
+            }
+            const grow = active * active;
+            ionTail.holder.scale.setScalar(0.45 + grow * 0.95);
+            dustTail.holder.scale.setScalar(0.45 + grow * 0.85);
+          }
+          setTailStrength(ionTail, active * 0.3 * dim);
+          setTailStrength(dustTail, active * 0.30 * dim);
+        },
+      };
       objects.projects = group;
     }
 
@@ -1099,13 +1511,53 @@
     const objectExtent: Partial<Record<CosmosKey, { x: number; y: number }>> = {};
     const measureBox = new THREE.Box3();
     const measureSize = new THREE.Vector3();
+    const measureChildBox = new THREE.Box3();
+
+    // Box3.setFromObject in a sentence, except that a subtree marked
+    // userData.noExtent is skipped along with everything under it.
+    //
+    // That exists for one case: Halley's comet, whose aphelion is 1.7x
+    // further out than Pluto's orbit. Framing is fitted to the measured
+    // bounding box, so including it would shrink the entire solar system to
+    // three-fifths of the frame in order to leave room for a comet that is
+    // off past the edge of it for most of a lap - paying, permanently, for
+    // something that isn't there. Measure the system; let the comet leave.
+    function expandExtent(box: THREE.Box3, object: THREE.Object3D) {
+      if (object.userData.noExtent) return;
+      const geometry = (object as THREE.Mesh).geometry;
+      if (geometry) {
+        if (!geometry.boundingBox) geometry.computeBoundingBox();
+        measureChildBox.copy(geometry.boundingBox!).applyMatrix4(object.matrixWorld);
+        box.union(measureChildBox);
+      }
+      for (const child of object.children) expandExtent(box, child);
+    }
+
+    const measureOrigin = new THREE.Vector3();
 
     function measureExtent(key: CosmosKey) {
       const group = objects[key];
       if (!group) return;
-      measureBox.setFromObject(group);
-      measureBox.getSize(measureSize);
-      objectExtent[key] = { x: measureSize.x, y: measureSize.y };
+      // Ancestors first (getWorldPosition walks up), then this subtree, so
+      // every matrix expandExtent reads is current.
+      group.getWorldPosition(measureOrigin);
+      group.updateWorldMatrix(false, true);
+      measureBox.makeEmpty();
+      expandExtent(measureBox, group);
+      // Not the box's size: twice its largest reach from the group's own
+      // origin. The camera aims at the origin, so what has to fit on screen
+      // is the furthest point from it, mirrored - and those two numbers only
+      // agree for something centred on its own origin. Kepler's first law
+      // guarantees the solar system isn't: the Sun sits at a *focus* of every
+      // orbit, never the centre, so the system reaches further to one side
+      // than the other and taking the size under-framed it enough to cut
+      // Pluto off the edge.
+      measureSize.set(
+        Math.max(measureOrigin.x - measureBox.min.x, measureBox.max.x - measureOrigin.x),
+        Math.max(measureOrigin.y - measureBox.min.y, measureBox.max.y - measureOrigin.y),
+        0,
+      );
+      objectExtent[key] = { x: measureSize.x * 2, y: measureSize.y * 2 };
     }
 
     // Re-measure and re-place after an asset that changes an object's size
@@ -1634,10 +2086,20 @@
         // but the destination of a leg *starts* as a speck - hiding it
         // outright is what turned the long approach to Contact into an
         // empty screen instead of a distant object growing closer.
+        //
+        // Only while actually travelling, though. journeyProgress sits on a
+        // whole number for the length of each waypoint's dwell, and
+        // exempting the *next* waypoint through that hold put a spiral
+        // galaxy in the middle of the solar system - far enough to be a
+        // smudge, near enough to read as part of the thing you'd stopped to
+        // look at. Parked, the size threshold decides, which is what it's
+        // for.
+        const travelling = inJourney && journeyProgress - journeyFrom > 0.001;
         const isActive =
           key === warpKey ||
           key === focusKey ||
-          (inJourney && (key === DEPTH_ORDER[journeyFrom] || key === DEPTH_ORDER[journeyTo]));
+          (inJourney && key === DEPTH_ORDER[journeyFrom]) ||
+          (travelling && key === DEPTH_ORDER[journeyTo]);
         group.getWorldPosition(cullWorldPos);
         const distance = cullWorldPos.distanceTo(camera.position);
         const extent = objectExtent[key];
@@ -1673,16 +2135,10 @@
       about.coronaOuter.material.opacity = (0.24 + Math.sin(clock * 0.6 + 1) * 0.06) * dimCurrent.about;
       about.starMat.color.setScalar(0.45 + 0.55 * dimCurrent.about);
 
-      const projects = objects.projects!.userData;
-      projects.planetPivots.forEach((pivot: THREE.Group, i: number) => {
-        pivot.rotation.z += projects.planetDefs[i].speed;
-      });
-      projects.asteroidPivot.rotation.z += projects.asteroidSpeed;
-      const asteroidMesh = projects.asteroidPivot.userData.mesh as THREE.Object3D | undefined;
-      if (asteroidMesh) {
-        asteroidMesh.rotation.x += 0.012;
-        asteroidMesh.rotation.y += 0.018;
-      }
+      // Eleven bodies on real orbital elements, so this one owns its own
+      // step rather than having its internals poked from out here. Fixed
+      // 0.016 to match `clock` above - the whole scene assumes a fixed step.
+      objects.projects!.userData.update(0.016, dimCurrent.projects);
 
       const music = objects.music!.userData;
       music.beamGroup.rotation.y += 0.02;

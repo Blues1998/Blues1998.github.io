@@ -1,11 +1,49 @@
-Sun / Mars / Saturn / Saturn ring / Neptune textures (sun-2k.jpg, mars-2k.jpg,
-saturn-2k.jpg, saturn-ring-2k.png, neptune-2k.jpg):
+Sun and planet surface maps
+---------------------------
+sun-2k.jpg, mercury-1k.jpg, venus-1k.jpg, earth-1k.jpg, mars-1k.jpg,
+jupiter-1k.jpg, saturn-1k.jpg, saturn-ring-2k.png, uranus-1k.jpg,
+neptune-1k.jpg
+
   Source: Solar System Scope (https://www.solarsystemscope.com/textures/)
   License: Creative Commons Attribution 4.0 International (CC BY 4.0)
   Attribution is displayed in the site footer.
 
-Nebula photography (nebula-1.jpg = "Pillars of Creation", nebula-2.jpg = "Mystic
-Mountain", both Hubble Space Telescope):
+  These are equirectangular maps derived from NASA imagery. Downsized from
+  the published 2k release to 1024x512 - at the size a planet actually
+  occupies on screen here, the extra resolution is payload with nothing to
+  show for it. The Sun is kept at 2k because it fills roughly a third of
+  the frame at the About waypoint, and the ring strip is kept at its
+  published width because it is only 125px tall to begin with.
+
+  venus-1k.jpg is the atmosphere map, not the radar surface map: Venus is
+  wrapped in unbroken cloud, so the surface map shows something no observer
+  has ever seen. The scene is meant to show what is actually there.
+
+
+Pluto surface map
+-----------------
+pluto-1k.jpg
+
+  Source: USGS Astrogeology / NASA New Horizons
+    "Pluto New Horizons LORRI - MVIC Global Mosaic 300m" (July 2017)
+    https://astrogeology.usgs.gov/search/map/pluto_new_horizons_lorri_mvic_global_mosaic_300m
+  License: Public domain (USGS/NASA)
+
+  Solar System Scope has no Pluto texture, so this comes from the USGS
+  mosaic instead - real New Horizons data, and the most complete global map
+  of Pluto that exists. USGS publishes it panchromatic (greyscale albedo),
+  so HomeCosmos.astro multiplies it by Pluto's measured mean colour rather
+  than shipping a colourised map that would imply per-region colour data
+  this file does not contain. Bright terrain (Sputnik Planitia's nitrogen
+  ice) and dark terrain (the tholin maculae) are real; the single tint
+  across them is an approximation, and deliberately a visible one.
+
+
+Nebula photography
+------------------
+nebula-1.jpg ("Pillars of Creation"), nebula-2.jpg ("Mystic Mountain"),
+both Hubble Space Telescope
+
   Source: NASA Image and Video Library (https://images.nasa.gov)
     nebula-1.jpg: NASA ID GSFC_20171208_Archive_e000842
     nebula-2.jpg: NASA ID PIA15985
