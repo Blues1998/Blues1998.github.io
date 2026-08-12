@@ -551,21 +551,66 @@
       }
 
       // One faint ellipse per body, sampled from the same orbitPoint() the
-      // body itself is positioned by. Additive so it can fade to nothing at
-      // the ends instead of to a visible black line.
+      // body itself is positioned by, so the drawn path cannot drift out of
+      // agreement with the body travelling along it.
+      //
+      // Built as a triangle ribbon rather than the obvious THREE.Line.
+      // gl.LINE_STRIP is the least dependable primitive in WebGL: width is
+      // clamped to 1px by every modern driver regardless of what you ask
+      // for, which on a hidpi display is a half-density hairline, and strips
+      // are the one primitive drivers are known to disagree about - they can
+      // come back partially drawn, which reads as orbits that stop in mid
+      // air rather than close. A ribbon is triangles, and triangles are the
+      // thing every GPU is actually built to rasterize identically.
+      //
+      // The ribbon is offset radially, which keeps it flat in the orbit
+      // plane the way a drawn orbit should be. It does foreshorten where the
+      // plane turns edge-on to the camera, which is correct behaviour for
+      // something lying in that plane.
       const orbitPointTmp = new THREE.Vector3();
-      function makeOrbitLine(o: Orbit, color: THREE.Color, opacity: number): THREE.Line {
-        const segments = 160;
-        const positions = new Float32Array((segments + 1) * 3);
+      // Bright and solid, not a hairline hint. These were drawn in the
+      // site's muted grey at half opacity, which on a dim display is below
+      // the point where a single line registers at all - and because they
+      // blend additively, the only place they showed was the knot near the
+      // Sun where four or five of them overlap and their brightness adds up.
+      // Which reads exactly like orbits that stop partway out. One line on
+      // its own now has to be visible on its own.
+      const ORBIT_COLOR = new THREE.Color(0xb9c6dd);
+      const ORBIT_WIDTH = 0.014;
+      function makeOrbitRing(o: Orbit, color: THREE.Color, opacity: number): THREE.Mesh {
+        const segments = 240;
+        const positions = new Float32Array((segments + 1) * 6);
+        const indices: number[] = [];
         for (let i = 0; i <= segments; i++) {
           orbitPoint(o, (i / segments) * Math.PI * 2, orbitPointTmp);
-          orbitPointTmp.toArray(positions, i * 3);
+          const r = orbitPointTmp.length() || 1;
+          const inner = (r - ORBIT_WIDTH / 2) / r;
+          const outer = (r + ORBIT_WIDTH / 2) / r;
+          const b = i * 6;
+          positions[b] = orbitPointTmp.x * inner;
+          positions[b + 1] = orbitPointTmp.y * inner;
+          positions[b + 2] = orbitPointTmp.z * inner;
+          positions[b + 3] = orbitPointTmp.x * outer;
+          positions[b + 4] = orbitPointTmp.y * outer;
+          positions[b + 5] = orbitPointTmp.z * outer;
+          if (i < segments) {
+            const v = i * 2;
+            indices.push(v, v + 1, v + 2, v + 1, v + 3, v + 2);
+          }
         }
         const geo = new THREE.BufferGeometry();
         geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-        return new THREE.Line(
+        geo.setIndex(indices);
+        return new THREE.Mesh(
           geo,
-          new THREE.LineBasicMaterial({ color, transparent: true, opacity, ...ADDITIVE_RGB_ONLY, depthWrite: false }),
+          new THREE.MeshBasicMaterial({
+            color,
+            transparent: true,
+            opacity,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            ...ADDITIVE_RGB_ONLY,
+          }),
         );
       }
 
@@ -675,7 +720,7 @@
 
       const sphereGeo = new THREE.SphereGeometry(1, 32, 24);
       const planets: { orbit: Orbit; holder: THREE.Object3D; spinner: THREE.Object3D; spin: number }[] = [];
-      const orbitLineMats: THREE.LineBasicMaterial[] = [];
+      const orbitLineMats: THREE.MeshBasicMaterial[] = [];
 
       BODIES.forEach((body) => {
         const orbit = makeOrbit(body.au, body.e, body.inc, body.node, body.peri, body.m0, body.periodDays);
@@ -728,9 +773,9 @@
           tilt.add(ring);
         }
 
-        const line = makeOrbitLine(orbit, mutedColor, 0.5);
+        const line = makeOrbitRing(orbit, ORBIT_COLOR, 0.9);
         group.add(line);
-        orbitLineMats.push(line.material as THREE.LineBasicMaterial);
+        orbitLineMats.push(line.material as THREE.MeshBasicMaterial);
 
         planets.push({ orbit, holder, spinner: mesh, spin: spinRate(body.dayHours) });
       });
@@ -743,7 +788,7 @@
       const itokawaOrbit = makeOrbit(1.324163, 0.28011, 1.6214, 69.081, 162.820, 294.3, 556.4);
       const itokawaHolder = new THREE.Object3D();
       group.add(itokawaHolder);
-      group.add(makeOrbitLine(itokawaOrbit, mutedColor, 0.28));
+      group.add(makeOrbitRing(itokawaOrbit, ORBIT_COLOR, 0.5));
       gltfLoader.load(
         `${cosmosAssetBase}models/cosmos/itokawa.glb`,
         (gltf: any) => {
@@ -872,7 +917,7 @@
           sun.rotation.y += spinRate(609.12) * dt; // the Sun turns once in ~25.4 days
           sunGlow.material.opacity = 0.5 * dim;
           sunHalo.material.opacity = 0.15 * dim;
-          orbitLineMats.forEach((m) => { m.opacity = 0.5 * dim; });
+          orbitLineMats.forEach((m) => { m.opacity = 0.9 * dim; });
 
           planets.forEach((p) => {
             orbitPoint(p.orbit, advance(p.orbit, dt), p.holder.position);
