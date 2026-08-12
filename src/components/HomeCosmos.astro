@@ -429,6 +429,7 @@
     // ascending node, argument of perihelion, axial tilt, spin direction,
     // ring geometry, and where all eleven bodies are standing right now.
     {
+      const SYSTEM_TILT = 0.44;
       const group = new THREE.Group();
       placeObject(group, "projects");
       // Tip the ecliptic toward the viewer. Everything below builds the
@@ -438,7 +439,11 @@
       // Saturn's rings vanish to a stroke at that angle, a waste of the one
       // fix this waypoint most needed. 25 degrees is enough to open the
       // orbits into ellipses and show the rings as rings.
-      group.rotation.x = 0.44;
+      //
+      // Named because makeOrbitRing() needs it too: it has to know which way
+      // the camera is looking in this group's frame to turn its ribbons
+      // toward it, and that is exactly this angle undone.
+      group.rotation.x = SYSTEM_TILT;
       anchor.add(group);
 
       const DEG = Math.PI / 180;
@@ -563,11 +568,28 @@
       // air rather than close. A ribbon is triangles, and triangles are the
       // thing every GPU is actually built to rasterize identically.
       //
-      // The ribbon is offset radially, which keeps it flat in the orbit
-      // plane the way a drawn orbit should be. It does foreshorten where the
-      // plane turns edge-on to the camera, which is correct behaviour for
-      // something lying in that plane.
-      const orbitPointTmp = new THREE.Vector3();
+      // The ribbon is turned to face the camera rather than laid flat in the
+      // orbital plane, and that is the whole reason these render at all.
+      //
+      // Flat in the plane is the obvious construction and it is what a real
+      // orbit is. But the plane is only tipped 25 degrees off edge-on to the
+      // camera, so a ribbon lying in it is being viewed almost edge-on too,
+      // and its width foreshortens by up to sin(25) - and unevenly, most of
+      // all at the top and bottom of each ellipse. Anywhere that pushes the
+      // projected width under one pixel, the rasterizer covers no sample and
+      // draws nothing at all. Not a fainter line: no line. That is holes
+      // scattered around each ellipse, at positions that move with the
+      // camera and differ between machines depending on pixel ratio and
+      // whether multisampling is on - which is exactly why this reproduced
+      // on Animesh's display and not in headless capture.
+      //
+      // Offsetting perpendicular to both the path and the view direction
+      // instead gives a ribbon that always presents its full width, so the
+      // stroke is a constant number of pixels the whole way round and has no
+      // thin places left to vanish in. This is what fat-line implementations
+      // do, without needing their shader. The view direction is taken as
+      // fixed because it effectively is: the camera parks square onto this
+      // waypoint and only ever drifts by the small parallax tilt.
       // Bright and solid, not a hairline hint. These were drawn in the
       // site's muted grey at half opacity, which on a dim display is below
       // the point where a single line registers at all - and because they
@@ -576,23 +598,41 @@
       // Which reads exactly like orbits that stop partway out. One line on
       // its own now has to be visible on its own.
       const ORBIT_COLOR = new THREE.Color(0xb9c6dd);
-      const ORBIT_WIDTH = 0.014;
+      const ORBIT_WIDTH = 0.011;
+      // The camera's forward direction expressed in this group's own frame,
+      // which is the world -Z axis undone by the group's tilt.
+      const ORBIT_VIEW = new THREE.Vector3(0, -Math.sin(SYSTEM_TILT), -Math.cos(SYSTEM_TILT)).normalize();
       function makeOrbitRing(o: Orbit, color: THREE.Color, opacity: number): THREE.Mesh {
         const segments = 240;
+        const path: THREE.Vector3[] = [];
+        for (let i = 0; i < segments; i++) {
+          path.push(orbitPoint(o, (i / segments) * Math.PI * 2, new THREE.Vector3()));
+        }
         const positions = new Float32Array((segments + 1) * 6);
         const indices: number[] = [];
+        const tangent = new THREE.Vector3();
+        const side = new THREE.Vector3();
         for (let i = 0; i <= segments; i++) {
-          orbitPoint(o, (i / segments) * Math.PI * 2, orbitPointTmp);
-          const r = orbitPointTmp.length() || 1;
-          const inner = (r - ORBIT_WIDTH / 2) / r;
-          const outer = (r + ORBIT_WIDTH / 2) / r;
+          const k = i % segments;
+          const p = path[k];
+          // Central difference, wrapped, so the seam where the ellipse closes
+          // is treated like every other sample and leaves no notch.
+          tangent.subVectors(path[(k + 1) % segments], path[(k - 1 + segments) % segments]);
+          side.crossVectors(tangent, ORBIT_VIEW);
+          if (side.lengthSq() < 1e-12) {
+            // Path running straight at the camera: no meaningful sideways.
+            // Fall back to the radial offset, which is never degenerate here.
+            side.copy(p).setLength(ORBIT_WIDTH / 2);
+          } else {
+            side.setLength(ORBIT_WIDTH / 2);
+          }
           const b = i * 6;
-          positions[b] = orbitPointTmp.x * inner;
-          positions[b + 1] = orbitPointTmp.y * inner;
-          positions[b + 2] = orbitPointTmp.z * inner;
-          positions[b + 3] = orbitPointTmp.x * outer;
-          positions[b + 4] = orbitPointTmp.y * outer;
-          positions[b + 5] = orbitPointTmp.z * outer;
+          positions[b] = p.x - side.x;
+          positions[b + 1] = p.y - side.y;
+          positions[b + 2] = p.z - side.z;
+          positions[b + 3] = p.x + side.x;
+          positions[b + 4] = p.y + side.y;
+          positions[b + 5] = p.z + side.z;
           if (i < segments) {
             const v = i * 2;
             indices.push(v, v + 1, v + 2, v + 1, v + 3, v + 2);
