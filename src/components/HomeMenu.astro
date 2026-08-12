@@ -1,11 +1,14 @@
 ---
-/* Homepage as a scroll-driven spatial journey: a tall (600vh) scroll
+/* Homepage as a scroll-driven spatial journey: a tall (800vh) scroll
    container with a sticky viewport-height panel pinned inside it. Scrolling
    through that container is read by HomeCosmos.astro every animation frame
-   (window.scrollY / innerHeight, clamped to the six waypoints) and drives
-   the persisted cosmos camera physically through the same six objects the
-   old menu only let you preview on hover - see the "Homepage spatial
-   journey" block in HomeCosmos.astro's script for the camera side of this.
+   and drives the persisted cosmos camera physically through the same six
+   objects the old menu only let you preview on hover - see the "Homepage
+   spatial journey" block in HomeCosmos.astro's script for the camera side.
+   One "leg" is the track's scrollable height divided by five, computed
+   from this element's real height in both files rather than assumed to be
+   a viewport, and most of each leg is spent held on a waypoint rather than
+   travelling between them.
    This component owns only the UI: a contextual "02 / 06 · Projects"
    readout (which doubles as the click-to-enter link into that section's
    real page) and a minimal six-dot indicator (click-to-travel, scrolls to
@@ -30,6 +33,27 @@ const menuItems = [
   { label: "Contact", href: `${base}contact/`, cosmosKey: "contact" },
 ];
 ---
+
+<!-- The journey is a scroll track whose only job is to drive a camera that
+     JavaScript builds. Without JS there is no camera, so what ships is
+     eight screens of empty scrolling with a single link at the top - the
+     markup renders regardless, since it's static HTML. Same swap the
+     scene-failed and narrow-viewport cases make, just declared where no
+     script has to run to apply it. Inline and unscoped on purpose: Astro
+     would otherwise defer this to a stylesheet the browser has to fetch,
+     and these class names belong to this component anyway. -->
+<noscript>
+  <style is:inline>
+    .home-journey { display: none !important; }
+    .home-menu-fallback {
+      display: flex !important;
+      align-items: center;
+      position: relative;
+      z-index: 2;
+      min-height: 100vh;
+    }
+  </style>
+</noscript>
 
 <div class="home-hero" id="home-hero">
   <div class="home-vignette" aria-hidden="true"></div>
@@ -63,6 +87,29 @@ const menuItems = [
             aria-current={i === 0 ? "true" : undefined}
           ></button>
         ))}
+      </nav>
+
+      {/* The journey shows one section name at a time, which means the
+          homepage offers exactly one real link - and this page hides the
+          site header, so there is no other way in. Sighted visitors scroll
+          to the rest; a screen reader or a keyboard has nothing to scroll
+          with and was simply stuck with whichever section the camera
+          happened to be at.
+
+          These are the same six destinations as plain links, out of the
+          visual layout but in the accessibility tree and in tab order.
+          They become visible on focus, so a sighted keyboard user sees
+          where they are rather than chasing an invisible focus ring.
+          Lives inside .home-journey so the media query that swaps to the
+          fallback list removes it too - only ever one set of links. */}
+      <nav class="home-journey-links" aria-label="Sections">
+        <ul>
+          {menuItems.map((item) => (
+            <li>
+              <a href={item.href} data-astro-reload={item.hardReload ? true : undefined}>{item.label}</a>
+            </li>
+          ))}
+        </ul>
       </nav>
     </div>
   </div>
@@ -110,8 +157,14 @@ const menuItems = [
     );
   }
 
+  /* Fixed, not absolute. This frames the *viewport* - it's the darkened
+     border of the shot you're currently looking at. Absolute made it span
+     the whole scroll track, so its gradient was centred 3800px down the
+     page and every actual screenful was sampling some off-centre slice of
+     one enormous ellipse: permanently over-darkened at the top and bottom
+     of the journey, and never doing the job anywhere. */
   .home-vignette {
-    position: absolute;
+    position: fixed;
     inset: 0;
     z-index: 3;
     pointer-events: none;
@@ -212,6 +265,52 @@ const menuItems = [
   .home-journey-label:focus-visible::after {
     opacity: 1;
     transform: translateX(0);
+  }
+
+  /* Out of the layout but not out of the accessibility tree: clipped to a
+     1px box rather than display:none or visibility:hidden, both of which
+     would take these out of tab order and defeat the point. */
+  .home-journey-links {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 5;
+  }
+
+  .home-journey-links ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .home-journey-links a {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Focused: pull it back into view as an ordinary link, so tabbing
+     through is legible rather than a hunt for an invisible target. */
+  .home-journey-links a:focus-visible {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    margin: var(--space-2);
+    padding: 0.5rem 0.9rem;
+    background: var(--color-bg);
+    border: 1px solid var(--color-accent);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    font-size: var(--font-size-sm);
+    text-decoration: none;
   }
 
   .home-journey-dots {
@@ -352,6 +451,27 @@ const menuItems = [
       min-height: 100vh;
     }
   }
+
+  /* Same swap again, but driven by the scene itself rather than by media
+     query: HomeCosmos.astro sets data-cosmos-failed on its persisted
+     container if WebGL is unavailable or the scene throws during init.
+     Without this the failure mode was eight screens of empty scrolling
+     with a single link at the top of it - the journey UI is meaningless
+     when there is no camera for it to drive. Selected from the cosmos
+     element because that is the only node that knows, and it is a sibling
+     of <main>; :global is required because it sits outside this
+     component's own scope. */
+  :global(#home-cosmos[data-cosmos-failed]) ~ :global(main) .home-journey {
+    display: none;
+  }
+
+  :global(#home-cosmos[data-cosmos-failed]) ~ :global(main) .home-menu-fallback {
+    display: flex;
+    align-items: center;
+    position: relative;
+    z-index: 2;
+    min-height: 100vh;
+  }
 </style>
 
 <script is:inline>
@@ -444,10 +564,15 @@ const menuItems = [
         // height so it tracks the CSS above; HomeCosmos.astro computes the
         // same figure the same way, which is what keeps the readout naming
         // the object the camera is actually looking at.
+        // Mirrors legLength() in HomeCosmos.astro, including its 0 case:
+        // when this track is hidden (narrow viewport) offsetHeight is 0,
+        // and dividing by the resulting single pixel reported the last
+        // waypoint for any scroll position at all.
         function legLength() {
           var vh = window.innerHeight || 1;
-          var legs = items.length - 1;
-          return Math.max(1, (root.offsetHeight - vh) / legs);
+          var scrollable = root.offsetHeight - vh;
+          if (scrollable < vh * 0.5) return 0;
+          return scrollable / (items.length - 1);
         }
 
         function update() {
@@ -455,7 +580,9 @@ const menuItems = [
           // that's the middle of the camera's actual transit window (the
           // 0.34-0.86 travel band in HomeCosmos.astro), so the name changes
           // while you're between objects instead of while still parked.
-          var idx = clampIndex(Math.floor(window.scrollY / legLength() + 0.4));
+          var leg = legLength();
+          if (leg <= 0) return;
+          var idx = clampIndex(Math.floor(window.scrollY / leg + 0.4));
           if (idx === lastIndex) return;
           lastIndex = idx;
 
@@ -491,7 +618,9 @@ const menuItems = [
 
         dots.forEach(function (dot, i) {
           dot.addEventListener("click", function () {
-            window.scrollTo({ top: i * legLength(), behavior: reduceMotion ? "auto" : "smooth" });
+            var leg = legLength();
+            if (leg <= 0) return;
+            window.scrollTo({ top: i * leg, behavior: reduceMotion ? "auto" : "smooth" });
           });
         });
 

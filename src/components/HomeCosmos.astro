@@ -80,6 +80,20 @@
   .home-cosmos[data-cosmos-mode="backdrop"] .cosmos-scrim {
     opacity: 1;
   }
+
+  /* Whether the six-object scene exists is decided once per tab (see
+     isDesktop below), but the homepage layout is decided by a live media
+     query - so narrowing a desktop window past the breakpoint leaves a
+     full-brightness nebula sitting directly behind the plain text menu
+     that replaces the journey. Nothing else puts unscrimmed body copy over
+     these objects. Keyed on data-cosmos-objects so a visitor who *loaded*
+     narrow, and therefore has only the faint starfield back there, doesn't
+     get a scrim they never needed. */
+  @media (max-width: 899px) {
+    .home-cosmos[data-cosmos-objects] .cosmos-scrim {
+      opacity: 1;
+    }
+  }
 </style>
 
 <script>
@@ -298,7 +312,14 @@
       photography: { z: -4000, offset: [0.15, -0.20],  scale: 187.5, frame: 0.88 }, // galaxy
       music:       { z: -6000, offset: [-0.40, -0.14], scale: 2.6,   frame: 0.80 }, // pulsar
       about:       { z: -7000, offset: [0.20, 0.25],   scale: 2.14,  frame: 0.86 }, // star
-      contact:     { z: -8000, offset: [-0.17, 0.22],  scale: 1.1,   frame: 0.72 }, // probe
+      // Over 1 on purpose, and the only one that is. Framing is fitted to
+      // an object's bounding box, which assumes the box is a fair proxy for
+      // what you look at - true for a nebula or a star, false for a
+      // spacecraft with a magnetometer boom several times longer than the
+      // body it hangs off. Fitting that box put the whole probe at about a
+      // quarter of the frame. Letting the boom run past the edges is both
+      // better looking and closer to how the thing is actually photographed.
+      contact:     { z: -8000, offset: [-0.17, 0.22],  scale: 1.1,   frame: 1.35 }, // probe
     };
 
     // Built at the origin's x/y and moved into place by placeObjects() once
@@ -315,6 +336,11 @@
     // phase - foundation work here is the starfield above, not a mobile
     // redesign of the menu scene.
     if (isDesktop) {
+    // Marks that the six narrative objects actually exist behind the page,
+    // which the scrim rule above needs to distinguish from a starfield-only
+    // tier. Set here rather than from the breakpoint so it stays true for
+    // the life of the tab, exactly like the decision it records.
+    container.dataset.cosmosObjects = "true";
     transitDust = createTransitDust(200, accentColor);
     scene.add(transitDust.object);
 
@@ -482,6 +508,7 @@
           });
           asteroidPivot.add(mesh);
           asteroidPivot.userData.mesh = mesh;
+          refreshFraming("projects");
         },
         undefined,
         (err: unknown) => console.error(LOG, "Failed to load asteroid model", err),
@@ -686,6 +713,9 @@
           placeholder.geometry.dispose();
           placeholderMat.dispose();
           body.add(probe);
+          // The probe is larger than the placeholder it replaced, so the
+          // camera's parking distance has to be recomputed from it.
+          refreshFraming("contact");
         },
         undefined,
         (err: unknown) => console.error(LOG, "Failed to load Voyager model", err),
@@ -1053,15 +1083,28 @@
     // drift out of step with the geometry the way six hand-written numbers
     // did.
     const objectExtent: Partial<Record<CosmosKey, { x: number; y: number }>> = {};
-    {
-      const box = new THREE.Box3();
-      const size = new THREE.Vector3();
-      (Object.keys(objects) as CosmosKey[]).forEach((key) => {
-        box.setFromObject(objects[key]!);
-        box.getSize(size);
-        objectExtent[key] = { x: size.x, y: size.y };
-      });
+    const measureBox = new THREE.Box3();
+    const measureSize = new THREE.Vector3();
+
+    function measureExtent(key: CosmosKey) {
+      const group = objects[key];
+      if (!group) return;
+      measureBox.setFromObject(group);
+      measureBox.getSize(measureSize);
+      objectExtent[key] = { x: measureSize.x, y: measureSize.y };
     }
+
+    // Re-measure and re-place after an asset that changes an object's size
+    // arrives. The glTF models load long after this initial pass, so
+    // without it the framing for Contact and Projects is derived from the
+    // placeholder that was standing in - correct only by coincidence, and
+    // silently wrong the moment either model's target size is touched.
+    function refreshFraming(key: CosmosKey) {
+      measureExtent(key);
+      placeObjects();
+    }
+
+    (Object.keys(objects) as CosmosKey[]).forEach(measureExtent);
 
     // Distance at which `frame` of the viewport is filled by the object,
     // in whichever axis is the tighter constraint. Recomputed rather than
@@ -1165,23 +1208,35 @@
     const journeyPointA = new THREE.Vector3();
     const journeyPointB = new THREE.Vector3();
     function journeyActive(): boolean {
-      return isDesktop && cosmosMode === "hero";
+      return isDesktop && cosmosMode === "hero" && legLength() > 0;
     }
     // Length of one leg in pixels, taken from the scroll track HomeMenu
     // actually rendered rather than assumed to be one viewport - the track
     // height is set in that component's CSS, and reading it here keeps the
     // two from silently disagreeing when it changes.
+    //
+    // Returns 0 to mean "there is no journey": the track is absent, or has
+    // been hidden by HomeMenu's media query. That happens for real - this
+    // component decides once per tab whether to build the six-object scene,
+    // so a visitor who narrows the window past 900px keeps the scene while
+    // the track disappears from under it. Previously offsetHeight went to 0,
+    // the leg collapsed to a single pixel, and any scroll position at all
+    // divided out to the last waypoint - the camera snapped to Contact and
+    // stayed there.
     function legLength(): number {
       const track = document.getElementById("home-journey");
+      if (!track) return 0;
       const vh = window.innerHeight || 1;
-      const legs = DEPTH_ORDER.length - 1;
-      const scrollable = track ? track.offsetHeight - vh : vh * legs;
-      return Math.max(1, scrollable / legs);
+      const scrollable = track.offsetHeight - vh;
+      if (scrollable < vh * 0.5) return 0;
+      return scrollable / (DEPTH_ORDER.length - 1);
     }
 
     function journeyDepthProgress(): number {
+      const leg = legLength();
+      if (leg <= 0) return 0;
       const max = DEPTH_ORDER.length - 1;
-      const raw = THREE.MathUtils.clamp(window.scrollY / legLength(), 0, max);
+      const raw = THREE.MathUtils.clamp(window.scrollY / leg, 0, max);
       const i = Math.floor(raw);
       const f = raw - i;
       const t = THREE.MathUtils.clamp((f - LEG_HOLD_START) / (LEG_HOLD_END - LEG_HOLD_START), 0, 1);
@@ -1346,6 +1401,7 @@
     // departed: a cold load or a back-button arrival should just be there,
     // not fade itself in from nothing after the content has already painted.
     let departed = false;
+    let warpWatchdog = 0;
 
     function setPageTransit(state: "depart" | "arrive" | null) {
       if (reduceMotion) return;
@@ -1359,6 +1415,17 @@
       // ask for. Guarded on `departed` rather than `warpKey` so it also
       // covers the tiers that have no objects to dive toward.
       if (departed) return;
+      // ...but never permanently. `departed` is normally cleared by
+      // astro:page-load on the other side; if that navigation never
+      // arrives - offline, a failed fetch, a blocked route - every
+      // subsequent click would be swallowed and the menu would look dead
+      // with no way back short of a reload. Release it either way.
+      window.clearTimeout(warpWatchdog);
+      warpWatchdog = window.setTimeout(() => {
+        departed = false;
+        warpKey = null;
+        setPageTransit(null);
+      }, WARP_NAV_DELAY_MS + 5000);
       const { key, href, reload } = e.detail;
       if (objects[key]) {
         focusKey = key;
@@ -1385,6 +1452,7 @@
       // object's space at this instant, and simply handing the rig a normal
       // resting standoff lets it ease back out under its own momentum.
       warpKey = null;
+      window.clearTimeout(warpWatchdog);
       if (departed) {
         departed = false;
         // The incoming content is still at the departed opacity (the state
@@ -1576,6 +1644,13 @@
       requestAnimationFrame(animate);
     }
   } catch (err) {
-    console.error(LOG, "Cosmos scene failed to initialize, leaving pane empty.", err);
+    // Leaving the pane empty is fine; leaving the *homepage* as it stands
+    // is not. The journey is a tall scroll track whose only purpose is to
+    // drive this camera, so without a scene it degrades to eight screens of
+    // nothing with one link in it. Flagging the container lets HomeMenu's
+    // CSS fall back to the plain section list, the same one mobile and
+    // reduced-motion visitors already get.
+    console.error(LOG, "Cosmos scene failed to initialize, falling back to the plain menu.", err);
+    document.getElementById("home-cosmos")?.setAttribute("data-cosmos-failed", "true");
   }
 </script>
