@@ -1553,7 +1553,7 @@
     // waypointDepths() needs it and that runs during the first resize().
     const DEPTH_ORDER: CosmosKey[] = ["playground", "projects", "photography", "music", "about", "contact"];
 
-    const objectExtent: Partial<Record<CosmosKey, { x: number; y: number }>> = {};
+    const objectExtent: Partial<Record<CosmosKey, { x: number; y: number; z: number }>> = {};
     const measureBox = new THREE.Box3();
     const measureSize = new THREE.Vector3();
     const measureChildBox = new THREE.Box3();
@@ -1600,9 +1600,9 @@
       measureSize.set(
         Math.max(measureOrigin.x - measureBox.min.x, measureBox.max.x - measureOrigin.x),
         Math.max(measureOrigin.y - measureBox.min.y, measureBox.max.y - measureOrigin.y),
-        0,
+        Math.max(measureOrigin.z - measureBox.min.z, measureBox.max.z - measureOrigin.z),
       );
-      objectExtent[key] = { x: measureSize.x * 2, y: measureSize.y * 2 };
+      objectExtent[key] = { x: measureSize.x * 2, y: measureSize.y * 2, z: measureSize.z * 2 };
     }
 
     // Re-measure and re-place after an asset that changes an object's size
@@ -1629,8 +1629,20 @@
       const halfFovTan = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
       const forHeight = extent.y / (2 * frame * halfFovTan);
       const forWidth = extent.x / (2 * frame * halfFovTan * camera.aspect);
-      // Never park inside the near plane, whatever the measurements say.
-      return Math.max(forHeight, forWidth, camera.near * 2.5);
+      // Never park inside the object itself, whatever the measurements say.
+      //
+      // The framing terms above only constrain how much of the frame the
+      // object fills; nothing in them stops the camera ending up *within*
+      // its bounding sphere, and for anything with real depth that means
+      // the near plane starts slicing through it. Small compact objects
+      // survive that - a planet is a point and never meets the near plane -
+      // but a wide thin structure like the solar system's orbit rings gets
+      // cut, and clipped geometry does not fade out politely: it ends in a
+      // hard straight edge where the plane crossed it, so complete ellipses
+      // render as arcs that stop in mid air with straight bars across them.
+      // Standing off the full bounding radius makes that unrepresentable.
+      const radius = Math.hypot(extent.x, extent.y, extent.z) / 2;
+      return Math.max(forHeight, forWidth, camera.near * 2.5, radius * 1.15 + camera.near);
     }
 
     // How far apart consecutive waypoints sit. Two terms, because a leg has
