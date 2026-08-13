@@ -1762,25 +1762,43 @@
     //
     // Not a depth-buffer bokeh pass. A real one would need an aperture
     // wide enough to blur something 2000 units out while holding a
-    // 3-unit-wide probe sharp, which is not a lens that exists. Each
-    // waypoint instead renders alone into a full-resolution target; a
-    // quarter-resolution blur of that target is built; and the composite
-    // mixes between the two by that object's own blur amount. Blur 0
-    // composites the sharp render untouched, so an object coming into
-    // focus arrives continuously - there is no threshold to pop across.
+    // 3-unit-wide probe sharp, which is not a lens that exists.
     //
-    // Layering per object is safe here because the waypoints are hundreds
-    // to thousands of units apart and never interpenetrate, so painter's
-    // order far-to-near is exactly the depth sort. And at any moment the
-    // camera is either parked at a waypoint or between two, which leaves
-    // two or three of the six visible - the rest are behind the camera or
-    // already culled for angular size.
+    // Only the objects actually being softened leave the main pass. Each
+    // renders alone into a half-resolution target, gets blurred at a
+    // quarter, and composites back over the frame. Everything sharp - the
+    // stars, the dust, the waypoint you're parked on - stays in one
+    // ordinary full-resolution multisampled pass, drawn exactly as it was
+    // before any of this existed.
+    //
+    // The first version put *every* waypoint through a full-resolution
+    // 4x-multisampled half-float target so that blur zero would composite
+    // the sharp render untouched. It was continuous and it was correct and
+    // it cost 45ms a frame at a dwell and 280ms mid-transit, against 4.7ms
+    // for the whole scene before it. A 3200x1900 multisampled half-float
+    // buffer is around 190MB; clearing and resolving one per visible
+    // object per frame is not a thing a page can do. Blurred objects are
+    // dim, distant and about to be unrecognisable, so half resolution and
+    // no multisampling costs nothing that can be seen - and the sharp
+    // object, which is the one you'd notice, never enters the pipeline.
+    //
+    // Ordering assumes every softened object sits behind the sharp one.
+    // That holds by construction: at waypoint i the camera parks at
+    // depth[i] + standoff, so waypoints before i are behind it and only
+    // the ones ahead are still on screen.
+    const DEFOCUS_LAYER_SCALE = 0.5;
     const DEFOCUS_BLUR_SCALE = 0.25;
     // Gaussian sigma in CSS pixels at full defocus. Chosen by eye against
     // the sun at Playground: enough that it reads as a glow you can't
     // resolve, not so much that it becomes a flat wash.
     const DEFOCUS_MAX_PX = 12;
-    let rtSharp: THREE.WebGLRenderTarget | null = null;
+    // Below this an object is still to all appearances sharp, so it stays
+    // in the main pass and pays nothing. Low enough that the half-
+    // resolution layer it crosses into is already carrying enough blur to
+    // hide the resolution it lost on the way in.
+    const DEFOCUS_MIN = 0.05;
+    const DEFOCUS_MAX_LAYERS = 2;
+    let rtLayer: THREE.WebGLRenderTarget | null = null;
     let rtPing: THREE.WebGLRenderTarget | null = null;
     let rtPong: THREE.WebGLRenderTarget | null = null;
     const drawSize = new THREE.Vector2();
@@ -1794,29 +1812,6 @@
         gl_Position = vec4(position.xy, 0.0, 1.0);
       }
     `;
-    // Four bilinear taps at a quarter of a *target* texel, which lands each
-    // one on the corner of a 2x2 block of source texels - so the four
-    // between them average the full 4x4 the downsample is collapsing. A
-    // plain 1:4 point sample would alias, and the galaxy is a point cloud:
-    // aliasing there is stars twinkling on and off as the camera creeps.
-    const downsampleMaterial = new THREE.ShaderMaterial({
-      uniforms: { tDiffuse: { value: null }, uTexel: { value: new THREE.Vector2() } },
-      vertexShader: QUAD_VERT,
-      fragmentShader: `
-        uniform sampler2D tDiffuse;
-        uniform vec2 uTexel;
-        varying vec2 vUv;
-        void main() {
-          vec4 c = texture2D(tDiffuse, vUv + uTexel * vec2(-0.25, -0.25));
-          c += texture2D(tDiffuse, vUv + uTexel * vec2( 0.25, -0.25));
-          c += texture2D(tDiffuse, vUv + uTexel * vec2(-0.25,  0.25));
-          c += texture2D(tDiffuse, vUv + uTexel * vec2( 0.25,  0.25));
-          gl_FragColor = c * 0.25;
-        }
-      `,
-      depthTest: false,
-      depthWrite: false,
-    });
     // The standard nine-tap gaussian folded into five linear-sampled taps.
     // Run separably and twice over, with the second pair at a wider spacing
     // than the first: two moderate gaussians compose into one wide one, and
@@ -1857,15 +1852,13 @@
     // (the galaxy haze still does, deliberately) instead of dividing by a
     // near-zero alpha and blowing out.
     const compositeMaterial = new THREE.ShaderMaterial({
-      uniforms: { tSharp: { value: null }, tBlur: { value: null }, uMix: { value: 0 } },
+      uniforms: { tBlur: { value: null } },
       vertexShader: QUAD_VERT,
       fragmentShader: `
-        uniform sampler2D tSharp;
         uniform sampler2D tBlur;
-        uniform float uMix;
         varying vec2 vUv;
         void main() {
-          vec4 texel = mix(texture2D(tSharp, vUv), texture2D(tBlur, vUv), uMix);
+          vec4 texel = texture2D(tBlur, vUv);
           float a = clamp(max(texel.a, max(texel.r, max(texel.g, texel.b))), 0.0, 1.0);
           if (a <= 0.0001) discard;
           gl_FragColor = vec4(texel.rgb / a, a);
@@ -1891,11 +1884,11 @@
 
     function sizeDefocusTargets() {
       renderer.getDrawingBufferSize(drawSize);
-      const w = Math.max(1, Math.floor(drawSize.x));
-      const h = Math.max(1, Math.floor(drawSize.y));
-      const bw = Math.max(1, Math.floor(w * DEFOCUS_BLUR_SCALE));
-      const bh = Math.max(1, Math.floor(h * DEFOCUS_BLUR_SCALE));
-      if (!rtSharp) {
+      const lw = Math.max(1, Math.floor(drawSize.x * DEFOCUS_LAYER_SCALE));
+      const lh = Math.max(1, Math.floor(drawSize.y * DEFOCUS_LAYER_SCALE));
+      const bw = Math.max(1, Math.floor(drawSize.x * DEFOCUS_BLUR_SCALE));
+      const bh = Math.max(1, Math.floor(drawSize.y * DEFOCUS_BLUR_SCALE));
+      if (!rtLayer) {
         // Half float, not the default eight bits per channel. What lands in
         // here is linear, un-tone-mapped scene light, and the composite
         // sRGB-encodes it afterwards - which stretches the darkest eighth
@@ -1903,18 +1896,19 @@
         // does not survive that: the pulsar's halo came back as a stack of
         // concentric rings. Falls back to eight-bit where a float colour
         // buffer isn't renderable, since banded is still better than blank.
+        //
+        // No multisampling. These three are only ever asked to hold
+        // something that is about to be blurred past the point where a
+        // jagged edge exists.
         const type = renderer.getContext().getExtension("EXT_color_buffer_float")
           ? THREE.HalfFloatType
           : THREE.UnsignedByteType;
-        // Multisampled for the same reason the canvas is, so an object that
-        // renders through here and one that doesn't can't differ in whether
-        // its edges are jagged.
-        rtSharp = new THREE.WebGLRenderTarget(w, h, { samples: 4, type });
+        rtLayer = new THREE.WebGLRenderTarget(lw, lh, { type });
         rtPing = new THREE.WebGLRenderTarget(bw, bh, { depthBuffer: false, type });
         rtPong = new THREE.WebGLRenderTarget(bw, bh, { depthBuffer: false, type });
         return;
       }
-      rtSharp.setSize(w, h);
+      rtLayer.setSize(lw, lh);
       rtPing!.setSize(bw, bh);
       rtPong!.setSize(bw, bh);
     }
@@ -1926,7 +1920,7 @@
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      if (rtSharp) sizeDefocusTargets();
+      if (rtLayer) sizeDefocusTargets();
       placeObjects();
     }
     resize();
@@ -2353,11 +2347,80 @@
     // no-op before that lands, since nothing dispatches it yet.
     document.addEventListener("astro:page-load", () => applyRouteFraming(reduceMotion));
 
+    // Screen footprint of a waypoint, in drawing-buffer pixels with the
+    // origin at the bottom left, padded for the blur that is about to be
+    // spread over it.
+    //
+    // Every pass below is scissored to this. A defocused waypoint is a
+    // small bright patch on a large dark frame, and without this each one
+    // was paying for a full-screen clear, a full-screen composite and five
+    // full-screen blur taps to move a few hundred pixels around. The pad
+    // is generous on purpose: the blur samples outside the rect, and what
+    // is outside is whatever the previous layer left there.
+    const scissorCenter = new THREE.Vector3();
+    const scissorRect = new THREE.Vector4();
+    function computeScissor(key: CosmosKey, blurPx: number, width: number, height: number) {
+      const extent = objectExtent[key];
+      objects[key]!.getWorldPosition(scissorCenter);
+      scissorCenter.applyMatrix4(camera.matrixWorldInverse);
+      const distance = -scissorCenter.z;
+      const radius = extent ? Math.hypot(extent.x, extent.y, extent.z) / 2 : 0;
+      // Behind the camera, or close enough to be around it: no meaningful
+      // rectangle exists, so take the whole frame and pay for it. Rare, and
+      // wrong in the safe direction.
+      if (distance <= radius * 1.2 || distance <= camera.near) {
+        scissorRect.set(0, 0, width, height);
+        return scissorRect;
+      }
+      // Perspective divide by hand rather than via project(), which would
+      // need the centre again in world space.
+      const halfHeight = Math.tan((camera.fov * Math.PI) / 360) * distance;
+      const halfWidth = halfHeight * camera.aspect;
+      const cx = (scissorCenter.x / halfWidth * 0.5 + 0.5) * width;
+      const cy = (scissorCenter.y / halfHeight * 0.5 + 0.5) * height;
+      const pad = (radius / halfHeight) * (height / 2) + blurPx * 3 + 8;
+      const x0 = Math.max(0, Math.floor(cx - pad));
+      const y0 = Math.max(0, Math.floor(cy - pad));
+      const x1 = Math.min(width, Math.ceil(cx + pad));
+      const y1 = Math.min(height, Math.ceil(cy + pad));
+      scissorRect.set(x0, y0, Math.max(0, x1 - x0), Math.max(0, y1 - y0));
+      return scissorRect;
+    }
+
+    // Two different scissors, because the renderer keeps two.
+    //
+    // An offscreen target carries its own, read once by setRenderTarget -
+    // so it has to be set on the target, before switching to it.
+    // renderer.setScissor() is only consulted when drawing to the canvas,
+    // and it takes CSS pixels: it multiplies by the pixel ratio itself. The
+    // rect here is in drawing-buffer pixels, so that has to be divided back
+    // out. Passing device pixels to it puts the rectangle at twice the
+    // intended offset and size, which on a retina display means somewhere
+    // off the bottom right of the screen - and the layer composites into
+    // nothing at all.
+    function scissorTo(rect: THREE.Vector4, target: THREE.WebGLRenderTarget | null, scale: number) {
+      const x = Math.floor(rect.x * scale);
+      const y = Math.floor(rect.y * scale);
+      const w = Math.ceil(rect.z * scale);
+      const h = Math.ceil(rect.w * scale);
+      if (target) {
+        target.scissor.set(x, y, w, h);
+        target.scissorTest = true;
+        renderer.setRenderTarget(target);
+        return;
+      }
+      const ratio = renderer.getPixelRatio();
+      renderer.setScissor(x / ratio, y / ratio, w / ratio, h / ratio);
+      renderer.setScissorTest(true);
+      renderer.setRenderTarget(null);
+    }
+
     function blurPass(
       source: THREE.Texture,
       target: THREE.WebGLRenderTarget,
       spacing: number,
       horizontal: boolean,
+      rect: THREE.Vector4,
     ) {
       quad.material = blurMaterial;
       blurMaterial.uniforms.tDiffuse.value = source;
@@ -2368,7 +2431,7 @@
         horizontal ? spacing / target.width : 0,
         horizontal ? 0 : spacing / target.height,
       );
-      renderer.setRenderTarget(target);
+      scissorTo(rect, target, DEFOCUS_BLUR_SCALE);
       renderer.clear(true, false, false);
       renderer.render(quadScene, quadCamera);
     }
@@ -2379,7 +2442,7 @@
       // none of the machinery below is paid for.
       let layered = false;
       for (const key of ALL_KEYS) {
-        if (objects[key]!.visible && blurCurrent[key] > 0.004) {
+        if (objects[key]!.visible && blurCurrent[key] > DEFOCUS_MIN) {
           layered = true;
           break;
         }
@@ -2394,65 +2457,80 @@
       ALL_KEYS.forEach((key, i) => {
         const group = objects[key]!;
         defocusWasVisible[i] = group.visible;
-        if (!group.visible) return;
+        if (!group.visible || blurCurrent[key] <= DEFOCUS_MIN) return;
         group.getWorldPosition(cullWorldPos);
         defocusLayers.push({ key, distance: cullWorldPos.distanceTo(camera.position) });
       });
       defocusLayers.sort((a, b) => b.distance - a.distance);
+      // A hard ceiling on what one frame will spend softening things. Two
+      // is what the journey actually produces - the waypoint behind and the
+      // one ahead - and anything past that is far enough to be a few dim
+      // pixels, which the haze has already taken most of the way to
+      // nothing. Drop the furthest, since those are the ones that cost the
+      // most relative to what they contribute.
+      if (defocusLayers.length > DEFOCUS_MAX_LAYERS) {
+        defocusLayers.splice(0, defocusLayers.length - DEFOCUS_MAX_LAYERS);
+      }
 
       renderer.autoClear = false;
 
-      // The backdrop, and the only thing that is never defocused: the stars
-      // are not somewhere you are travelling to, they are the room.
+      // Pass one: the room. Stars and transit dust, never defocused - they
+      // are not somewhere you are travelling to.
       anchor.visible = false;
       renderer.setRenderTarget(null);
       renderer.clear();
       renderer.render(scene, camera);
       anchor.visible = true;
 
+      // Pass two: one softened object at a time, back to front.
       starfield.group.visible = false;
       const dust = transitDust ? transitDust.object : null;
       if (dust) dust.visible = false;
 
       for (const layer of defocusLayers) {
+        // Sigma is asked for in CSS pixels, so it converts through the
+        // device pixel ratio and then through the blur target's own scale.
+        const blurPx = DEFOCUS_MAX_PX * renderer.getPixelRatio() * blurCurrent[layer.key];
+        const rect = computeScissor(layer.key, blurPx, drawSize.x, drawSize.y);
+        if (rect.z <= 0 || rect.w <= 0) continue;
+        // Two separable passes at spacings s and 0.6s compose to a sigma of
+        // about 2.33s; solve back for the spacing that lands on the sigma
+        // asked for.
+        const spacing = Math.max(0.35, (blurPx * DEFOCUS_BLUR_SCALE) / 2.33);
+
         ALL_KEYS.forEach((key) => {
           objects[key]!.visible = key === layer.key;
         });
-        renderer.setRenderTarget(rtSharp);
+        scissorTo(rect, rtLayer, DEFOCUS_LAYER_SCALE);
         renderer.clear(true, true, true);
         renderer.render(scene, camera);
 
-        const blur = blurCurrent[layer.key];
-        let blurred: THREE.Texture = rtSharp!.texture;
-        if (blur > 0.004) {
-          // Sigma is asked for in CSS pixels, so it converts through the
-          // device pixel ratio and then through the target's own scale.
-          const sigma = DEFOCUS_MAX_PX * renderer.getPixelRatio() * DEFOCUS_BLUR_SCALE * blur;
-          // Two separable passes at spacings s and 0.6s compose to a sigma
-          // of about 2.33s; solve back for the spacing that lands on the
-          // sigma asked for.
-          const spacing = Math.max(0.35, sigma / 2.33);
-          quad.material = downsampleMaterial;
-          downsampleMaterial.uniforms.tDiffuse.value = rtSharp!.texture;
-          downsampleMaterial.uniforms.uTexel.value.set(1 / rtPing!.width, 1 / rtPing!.height);
-          renderer.setRenderTarget(rtPing);
-          renderer.clear(true, false, false);
-          renderer.render(quadScene, quadCamera);
-
-          blurPass(rtPing!.texture, rtPong!, spacing * 0.6, true);
-          blurPass(rtPong!.texture, rtPing!, spacing * 0.6, false);
-          blurPass(rtPing!.texture, rtPong!, spacing, true);
-          blurPass(rtPong!.texture, rtPing!, spacing, false);
-          blurred = rtPing!.texture;
-        }
+        // The first horizontal pass reads the half-resolution layer and
+        // writes the quarter-resolution one, so it is the downsample as
+        // well. Its taps reach about two source texels either side, which
+        // is wide enough that a 2:1 reduction doesn't alias - the reason
+        // this used to be a separate box filter.
+        blurPass(rtLayer!.texture, rtPing!, spacing * 0.6, true, rect);
+        blurPass(rtPing!.texture, rtPong!, spacing * 0.6, false, rect);
+        blurPass(rtPong!.texture, rtPing!, spacing, true, rect);
+        blurPass(rtPing!.texture, rtPong!, spacing, false, rect);
 
         quad.material = compositeMaterial;
-        compositeMaterial.uniforms.tSharp.value = rtSharp!.texture;
-        compositeMaterial.uniforms.tBlur.value = blurred;
-        compositeMaterial.uniforms.uMix.value = blur > 0.004 ? blur : 0;
-        renderer.setRenderTarget(null);
+        compositeMaterial.uniforms.tBlur.value = rtPing!.texture;
+        scissorTo(rect, null, 1);
         renderer.render(quadScene, quadCamera);
       }
+      renderer.setScissorTest(false);
+
+      // Pass three: everything still sharp, straight onto the frame at full
+      // resolution with the canvas's own multisampling - the ordinary path,
+      // drawing the ordinary way. Over the softened layers rather than
+      // under them, which is the right order because every softened object
+      // is further from the camera than the one in focus.
+      ALL_KEYS.forEach((key, i) => {
+        objects[key]!.visible = defocusWasVisible[i] && blurCurrent[key] <= DEFOCUS_MIN;
+      });
+      renderer.render(scene, camera);
 
       ALL_KEYS.forEach((key, i) => {
         objects[key]!.visible = defocusWasVisible[i];
