@@ -1851,6 +1851,22 @@
     // and rescues anything additive that wrote colour without coverage
     // (the galaxy haze still does, deliberately) instead of dividing by a
     // near-zero alpha and blowing out.
+    //
+    // Added, not composited over. "Over" darkens the destination by the
+    // layer's alpha everywhere the layer has any at all - and a blurred
+    // corona has a little alpha across its entire rectangle. The result is
+    // a faint square veil over whatever is behind it, with a hard edge
+    // exactly where the scissor stops. No pad is large enough to fix that:
+    // a soft glow has no edge to contain, so wherever the rectangle ends,
+    // it shows.
+    //
+    // Adding also happens to be exactly what these objects did before any
+    // of this existed. Encoding the straight colour and multiplying alpha
+    // back in reproduces the hardware's own SrcAlpha/One arithmetic term
+    // for term, so a layer now composites to the same pixels the direct
+    // additive pass produced. Alpha accumulates too - see
+    // ADDITIVE_WITH_ALPHA above for what happens on a real compositor when
+    // it doesn't.
     const compositeMaterial = new THREE.ShaderMaterial({
       uniforms: { tBlur: { value: null } },
       vertexShader: QUAD_VERT,
@@ -1873,10 +1889,10 @@
       blending: THREE.CustomBlending,
       blendEquation: THREE.AddEquation,
       blendSrc: THREE.OneFactor,
-      blendDst: THREE.OneMinusSrcAlphaFactor,
+      blendDst: THREE.OneFactor,
       blendEquationAlpha: THREE.AddEquation,
       blendSrcAlpha: THREE.OneFactor,
-      blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
+      blendDstAlpha: THREE.OneFactor,
     });
     const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), blurMaterial);
     quad.frustumCulled = false;
@@ -2415,6 +2431,21 @@
       renderer.setRenderTarget(null);
     }
 
+    // Wipes all three targets outside the scissor as well as inside, once
+    // per layer. The scissor bounds what each pass *draws*; it does not
+    // bound what the blur *samples*, and the taps reach far enough past the
+    // rectangle to pick up whatever the previous layer left there. Since
+    // the composite adds, that arrives as a ghost of the last object,
+    // fringing the edge of this one. Clears are bandwidth, not shading -
+    // cheap enough that bounding them is not worth the correctness risk.
+    function clearLayerTargets() {
+      for (const target of [rtLayer!, rtPing!, rtPong!]) {
+        target.scissorTest = false;
+        renderer.setRenderTarget(target);
+        renderer.clear(true, true, true);
+      }
+    }
+
     function blurPass(
       source: THREE.Texture,
       target: THREE.WebGLRenderTarget,
@@ -2432,7 +2463,6 @@
         horizontal ? 0 : spacing / target.height,
       );
       scissorTo(rect, target, DEFOCUS_BLUR_SCALE);
-      renderer.clear(true, false, false);
       renderer.render(quadScene, quadCamera);
     }
 
@@ -2501,8 +2531,8 @@
         ALL_KEYS.forEach((key) => {
           objects[key]!.visible = key === layer.key;
         });
+        clearLayerTargets();
         scissorTo(rect, rtLayer, DEFOCUS_LAYER_SCALE);
-        renderer.clear(true, true, true);
         renderer.render(scene, camera);
 
         // The first horizontal pass reads the half-resolution layer and
@@ -2516,7 +2546,11 @@
         blurPass(rtPing!.texture, rtPong!, spacing, false, rect);
 
         quad.material = compositeMaterial;
-        compositeMaterial.uniforms.tBlur.value = rtPing!.texture;
+        // rtPong, because the last of the four passes wrote it. Folding the
+        // downsample into the first pass moved the ping-pong by one, and
+        // reading rtPing here was reading the state before the final
+        // vertical blur - a horizontally-smeared layer.
+        compositeMaterial.uniforms.tBlur.value = rtPong!.texture;
         scissorTo(rect, null, 1);
         renderer.render(quadScene, quadCamera);
       }
