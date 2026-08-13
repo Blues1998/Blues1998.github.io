@@ -568,81 +568,40 @@
       // air rather than close. A ribbon is triangles, and triangles are the
       // thing every GPU is actually built to rasterize identically.
       //
-      // The ribbon is turned to face the camera rather than laid flat in the
-      // orbital plane, and that is the whole reason these render at all.
+      // Drawn as a tube along the path, which is the one construction that
+      // looks the same from wherever you happen to be standing.
       //
-      // Flat in the plane is the obvious construction and it is what a real
-      // orbit is. But the plane is only tipped 25 degrees off edge-on to the
-      // camera, so a ribbon lying in it is being viewed almost edge-on too,
-      // and its width foreshortens by up to sin(25) - and unevenly, most of
-      // all at the top and bottom of each ellipse. Anywhere that pushes the
-      // projected width under one pixel, the rasterizer covers no sample and
-      // draws nothing at all. Not a fainter line: no line. That is holes
-      // scattered around each ellipse, at positions that move with the
-      // camera and differ between machines depending on pixel ratio and
-      // whether multisampling is on - which is exactly why this reproduced
-      // on Animesh's display and not in headless capture.
+      // Two earlier attempts failed on the same point. A flat ribbon lying
+      // in the orbital plane is what a real orbit is, but the plane is tipped
+      // only 25 degrees off edge-on, so the ribbon is viewed nearly edge-on
+      // too: its width foreshortens, and anywhere that pushes it under a
+      // pixel the rasterizer covers no sample and draws nothing at all. Not
+      // a fainter line - no line. Turning the ribbon to face the camera fixes
+      // that only while the camera is where you assumed it was, and it is
+      // not: clicking a waypoint dives to a third of the parked distance,
+      // which for this object is *inside* the shell of orbits. Seen from in
+      // there the assumed view direction is wrong by a lot and differently
+      // wrong across the frame, so the ribbons flare into broad flat bands
+      // in some places and vanish in others.
       //
-      // Offsetting perpendicular to both the path and the view direction
-      // instead gives a ribbon that always presents its full width, so the
-      // stroke is a constant number of pixels the whole way round and has no
-      // thin places left to vanish in. This is what fat-line implementations
-      // do, without needing their shader. The view direction is taken as
-      // fixed because it effectively is: the camera parks square onto this
-      // waypoint and only ever drifts by the small parallax tilt.
-      // Bright and solid, not a hairline hint. These were drawn in the
-      // site's muted grey at half opacity, which on a dim display is below
-      // the point where a single line registers at all - and because they
-      // blend additively, the only place they showed was the knot near the
-      // Sun where four or five of them overlap and their brightness adds up.
-      // Which reads exactly like orbits that stop partway out. One line on
-      // its own now has to be visible on its own.
+      // A tube has no preferred viewing direction to get wrong. It costs
+      // about 2,900 triangles per orbit, which against everything else in
+      // this scene is nothing, and it removes the entire class of problem
+      // rather than the instance of it.
       const ORBIT_COLOR = new THREE.Color(0xb9c6dd);
-      const ORBIT_WIDTH = 0.011;
-      // The camera's forward direction expressed in this group's own frame,
-      // which is the world -Z axis undone by the group's tilt.
-      const ORBIT_VIEW = new THREE.Vector3(0, -Math.sin(SYSTEM_TILT), -Math.cos(SYSTEM_TILT)).normalize();
+      const ORBIT_RADIUS = 0.0038;
       function makeOrbitRing(o: Orbit, color: THREE.Color, opacity: number): THREE.Mesh {
         const segments = 240;
         const path: THREE.Vector3[] = [];
         for (let i = 0; i < segments; i++) {
           path.push(orbitPoint(o, (i / segments) * Math.PI * 2, new THREE.Vector3()));
         }
-        const positions = new Float32Array((segments + 1) * 6);
-        const indices: number[] = [];
-        const tangent = new THREE.Vector3();
-        const side = new THREE.Vector3();
-        for (let i = 0; i <= segments; i++) {
-          const k = i % segments;
-          const p = path[k];
-          // Central difference, wrapped, so the seam where the ellipse closes
-          // is treated like every other sample and leaves no notch.
-          tangent.subVectors(path[(k + 1) % segments], path[(k - 1 + segments) % segments]);
-          side.crossVectors(tangent, ORBIT_VIEW);
-          if (side.lengthSq() < 1e-12) {
-            // Path running straight at the camera: no meaningful sideways.
-            // Fall back to the radial offset, which is never degenerate here.
-            side.copy(p).setLength(ORBIT_WIDTH / 2);
-          } else {
-            side.setLength(ORBIT_WIDTH / 2);
-          }
-          const b = i * 6;
-          positions[b] = p.x - side.x;
-          positions[b + 1] = p.y - side.y;
-          positions[b + 2] = p.z - side.z;
-          positions[b + 3] = p.x + side.x;
-          positions[b + 4] = p.y + side.y;
-          positions[b + 5] = p.z + side.z;
-          if (i < segments) {
-            const v = i * 2;
-            indices.push(v, v + 1, v + 2, v + 1, v + 3, v + 2);
-          }
-        }
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-        geo.setIndex(indices);
+        // Tension 0 (centripetal would round the corners of a closed loop
+        // that has none). Closed, so the seam is interpolated like any other
+        // sample and leaves no notch where the ellipse meets itself.
+        const curve = new THREE.CatmullRomCurve3(path, true, "catmullrom", 0);
         return new THREE.Mesh(
-          geo,
+          new THREE.TubeGeometry(curve, segments, ORBIT_RADIUS, 6, true),
           new THREE.MeshBasicMaterial({
             color,
             transparent: true,
