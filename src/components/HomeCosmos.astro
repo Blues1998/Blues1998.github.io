@@ -1752,6 +1752,173 @@
       });
     }
 
+    // ---- Defocus ----------------------------------------------------
+    // The journey has one subject at a time and five other objects strung
+    // out across 8000 units of depth around it. Dimming alone never sold
+    // that: a sun 2000 units away is still a *sharp* sun, so it read as
+    // something sitting in the same plane as the thing you'd stopped to
+    // look at rather than as somewhere you hadn't arrived at yet - light
+    // punching through the nebula instead of hanging behind it.
+    //
+    // Not a depth-buffer bokeh pass. A real one would need an aperture
+    // wide enough to blur something 2000 units out while holding a
+    // 3-unit-wide probe sharp, which is not a lens that exists. Each
+    // waypoint instead renders alone into a full-resolution target; a
+    // quarter-resolution blur of that target is built; and the composite
+    // mixes between the two by that object's own blur amount. Blur 0
+    // composites the sharp render untouched, so an object coming into
+    // focus arrives continuously - there is no threshold to pop across.
+    //
+    // Layering per object is safe here because the waypoints are hundreds
+    // to thousands of units apart and never interpenetrate, so painter's
+    // order far-to-near is exactly the depth sort. And at any moment the
+    // camera is either parked at a waypoint or between two, which leaves
+    // two or three of the six visible - the rest are behind the camera or
+    // already culled for angular size.
+    const DEFOCUS_BLUR_SCALE = 0.25;
+    // Gaussian sigma in CSS pixels at full defocus. Chosen by eye against
+    // the sun at Playground: enough that it reads as a glow you can't
+    // resolve, not so much that it becomes a flat wash.
+    const DEFOCUS_MAX_PX = 12;
+    let rtSharp: THREE.WebGLRenderTarget | null = null;
+    let rtPing: THREE.WebGLRenderTarget | null = null;
+    let rtPong: THREE.WebGLRenderTarget | null = null;
+    const drawSize = new THREE.Vector2();
+
+    const quadCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const quadScene = new THREE.Scene();
+    const QUAD_VERT = `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position.xy, 0.0, 1.0);
+      }
+    `;
+    // Four bilinear taps at a quarter of a *target* texel, which lands each
+    // one on the corner of a 2x2 block of source texels - so the four
+    // between them average the full 4x4 the downsample is collapsing. A
+    // plain 1:4 point sample would alias, and the galaxy is a point cloud:
+    // aliasing there is stars twinkling on and off as the camera creeps.
+    const downsampleMaterial = new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, uTexel: { value: new THREE.Vector2() } },
+      vertexShader: QUAD_VERT,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform vec2 uTexel;
+        varying vec2 vUv;
+        void main() {
+          vec4 c = texture2D(tDiffuse, vUv + uTexel * vec2(-0.25, -0.25));
+          c += texture2D(tDiffuse, vUv + uTexel * vec2( 0.25, -0.25));
+          c += texture2D(tDiffuse, vUv + uTexel * vec2(-0.25,  0.25));
+          c += texture2D(tDiffuse, vUv + uTexel * vec2( 0.25,  0.25));
+          gl_FragColor = c * 0.25;
+        }
+      `,
+      depthTest: false,
+      depthWrite: false,
+    });
+    // The standard nine-tap gaussian folded into five linear-sampled taps.
+    // Run separably and twice over, with the second pair at a wider spacing
+    // than the first: two moderate gaussians compose into one wide one, and
+    // the mismatched spacings keep the five taps from leaving a visible
+    // comb at the widest settings.
+    const blurMaterial = new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, uStep: { value: new THREE.Vector2() } },
+      vertexShader: QUAD_VERT,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform vec2 uStep;
+        varying vec2 vUv;
+        void main() {
+          vec4 c = texture2D(tDiffuse, vUv) * 0.2270270270;
+          c += texture2D(tDiffuse, vUv + uStep * 1.3846153846) * 0.3162162162;
+          c += texture2D(tDiffuse, vUv - uStep * 1.3846153846) * 0.3162162162;
+          c += texture2D(tDiffuse, vUv + uStep * 3.2307692308) * 0.0702702703;
+          c += texture2D(tDiffuse, vUv - uStep * 3.2307692308) * 0.0702702703;
+          gl_FragColor = c;
+        }
+      `,
+      depthTest: false,
+      depthWrite: false,
+    });
+    // Everything in the offscreen targets is linear and premultiplied: the
+    // renderer only applies tone mapping and the output transform when it
+    // is drawing to the canvas, so this pass owes both.
+    //
+    // The unpremultiply/re-premultiply around them is not ceremony. sRGB
+    // encoding raises 0.5 to 0.73, so encoding a premultiplied colour in
+    // place can leave RGB above alpha - the exact illegal state that made
+    // the orbits vanish on a real compositor. Encoding the straight colour
+    // and multiplying alpha back in afterwards cannot.
+    //
+    // Alpha is taken as the larger of the layer's own alpha and its
+    // brightest channel, which costs nothing where the two already agree
+    // and rescues anything additive that wrote colour without coverage
+    // (the galaxy haze still does, deliberately) instead of dividing by a
+    // near-zero alpha and blowing out.
+    const compositeMaterial = new THREE.ShaderMaterial({
+      uniforms: { tSharp: { value: null }, tBlur: { value: null }, uMix: { value: 0 } },
+      vertexShader: QUAD_VERT,
+      fragmentShader: `
+        uniform sampler2D tSharp;
+        uniform sampler2D tBlur;
+        uniform float uMix;
+        varying vec2 vUv;
+        void main() {
+          vec4 texel = mix(texture2D(tSharp, vUv), texture2D(tBlur, vUv), uMix);
+          float a = clamp(max(texel.a, max(texel.r, max(texel.g, texel.b))), 0.0, 1.0);
+          if (a <= 0.0001) discard;
+          gl_FragColor = vec4(texel.rgb / a, a);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+          gl_FragColor.rgb *= gl_FragColor.a;
+        }
+      `,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      blending: THREE.CustomBlending,
+      blendEquation: THREE.AddEquation,
+      blendSrc: THREE.OneFactor,
+      blendDst: THREE.OneMinusSrcAlphaFactor,
+      blendEquationAlpha: THREE.AddEquation,
+      blendSrcAlpha: THREE.OneFactor,
+      blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
+    });
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), blurMaterial);
+    quad.frustumCulled = false;
+    quadScene.add(quad);
+
+    function sizeDefocusTargets() {
+      renderer.getDrawingBufferSize(drawSize);
+      const w = Math.max(1, Math.floor(drawSize.x));
+      const h = Math.max(1, Math.floor(drawSize.y));
+      const bw = Math.max(1, Math.floor(w * DEFOCUS_BLUR_SCALE));
+      const bh = Math.max(1, Math.floor(h * DEFOCUS_BLUR_SCALE));
+      if (!rtSharp) {
+        // Half float, not the default eight bits per channel. What lands in
+        // here is linear, un-tone-mapped scene light, and the composite
+        // sRGB-encodes it afterwards - which stretches the darkest eighth
+        // of the range over a third of the output. Eight bits of linear
+        // does not survive that: the pulsar's halo came back as a stack of
+        // concentric rings. Falls back to eight-bit where a float colour
+        // buffer isn't renderable, since banded is still better than blank.
+        const type = renderer.getContext().getExtension("EXT_color_buffer_float")
+          ? THREE.HalfFloatType
+          : THREE.UnsignedByteType;
+        // Multisampled for the same reason the canvas is, so an object that
+        // renders through here and one that doesn't can't differ in whether
+        // its edges are jagged.
+        rtSharp = new THREE.WebGLRenderTarget(w, h, { samples: 4, type });
+        rtPing = new THREE.WebGLRenderTarget(bw, bh, { depthBuffer: false, type });
+        rtPong = new THREE.WebGLRenderTarget(bw, bh, { depthBuffer: false, type });
+        return;
+      }
+      rtSharp.setSize(w, h);
+      rtPing!.setSize(bw, bh);
+      rtPong!.setSize(bw, bh);
+    }
+
     function resize() {
       const rect = container!.getBoundingClientRect();
       const w = rect.width || 1;
@@ -1759,6 +1926,7 @@
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      if (rtSharp) sizeDefocusTargets();
       placeObjects();
     }
     resize();
@@ -1781,6 +1949,18 @@
     const ALL_KEYS = Object.keys(objects) as CosmosKey[];
     let focusKey: CosmosKey | null = null;
     const dimCurrent: Record<CosmosKey, number> = { about: 1, projects: 1, playground: 1, music: 1, photography: 1, contact: 1 };
+    // 0 = in focus, 1 = as out of focus as the scene goes. Eased on the
+    // same lag as dimCurrent so the two always move together - they are two
+    // halves of one effect, and a waypoint that dimmed before it softened
+    // (or after) reads as two separate things happening.
+    const blurCurrent: Record<CosmosKey, number> = { about: 0, projects: 0, playground: 0, music: 0, photography: 0, contact: 0 };
+    // Declared up here with the state they belong to rather than beside
+    // renderFrame() below: applyRouteFraming() renders a frame of its own
+    // and can run from a page-load event that lands while this module is
+    // still evaluating, which would hit the dead zone of a `const` further
+    // down. The same race that silently swallowed two of the models.
+    const defocusLayers: { key: CosmosKey; distance: number }[] = [];
+    const defocusWasVisible: boolean[] = [];
     const objectWorldPos = new THREE.Vector3();
     const framedTarget = new THREE.Vector3();
     const cullWorldPos = new THREE.Vector3();
@@ -1821,8 +2001,22 @@
     // shrinks them to specks, and the far ones (a galaxy hanging behind the
     // nebula) are the whole reason the vista reads as deep, so dimming them
     // out of existence would throw away the effect the layout just bought.
-    const DIM_FLOOR = 0.3;
-    const DIM_FALLOFF = 0.35;
+    // Was 0.3/0.35, which left the *next* waypoint - one leg away, so a
+    // distance of exactly 1 - sitting at 65% brightness. That is most of
+    // full strength, and it is why the sun read as shining through the
+    // nebula rather than waiting a journey behind it. At 0.62 a neighbour
+    // lands at 38% and is on the floor by a leg and a half. The floor
+    // itself is deliberately not zero: the deep vista is the point, and an
+    // object you can just make out ahead is what tells you there is
+    // somewhere to go.
+    const DIM_FLOOR = 0.22;
+    const DIM_FALLOFF = 0.62;
+    // Defocus ramp, in the same units: journey distance in legs. Held at
+    // zero for the first sixth of a leg so that a waypoint stays properly
+    // sharp through its dwell and the first moments of leaving it, rather
+    // than going soft the instant the scroll ticks.
+    const DEFOCUS_START = 0.16;
+    const DEFOCUS_FULL = 0.9;
     const journeyPointA = new THREE.Vector3();
     const journeyPointB = new THREE.Vector3();
     function journeyActive(): boolean {
@@ -2146,17 +2340,128 @@
       if (instant) {
         ALL_KEYS.forEach((key) => {
           dimCurrent[key] = focusKey === null ? 1 : key === focusKey ? 1 : DIM_FLOOR;
+          blurCurrent[key] = focusKey === null ? 0 : key === focusKey ? 0 : 1;
         });
       }
       cameraRig.setTarget(framedTarget, standoff);
       cameraRig.snapToTarget();
       starfield.group.position.copy(camera.position);
-      if (instant) renderer.render(scene, camera);
+      if (instant) renderFrame();
     }
     // Fires on the first load and on every subsequent client-side
     // navigation alike once <ClientRouter /> is active in BaseLayout; a
     // no-op before that lands, since nothing dispatches it yet.
     document.addEventListener("astro:page-load", () => applyRouteFraming(reduceMotion));
+
+    function blurPass(
+      source: THREE.Texture,
+      target: THREE.WebGLRenderTarget,
+      spacing: number,
+      horizontal: boolean,
+    ) {
+      quad.material = blurMaterial;
+      blurMaterial.uniforms.tDiffuse.value = source;
+      // Offsets are in target texels either way: for the separable pair the
+      // two targets are the same size, and for the first read out of the
+      // full-resolution target sampling at the coarser pitch is the point.
+      blurMaterial.uniforms.uStep.value.set(
+        horizontal ? spacing / target.width : 0,
+        horizontal ? 0 : spacing / target.height,
+      );
+      renderer.setRenderTarget(target);
+      renderer.clear(true, false, false);
+      renderer.render(quadScene, quadCamera);
+    }
+
+    function renderFrame() {
+      // Nothing defocused - no journey, reduced motion, a mobile tier with
+      // no waypoints at all - so the whole scene is one ordinary pass and
+      // none of the machinery below is paid for.
+      let layered = false;
+      for (const key of ALL_KEYS) {
+        if (objects[key]!.visible && blurCurrent[key] > 0.004) {
+          layered = true;
+          break;
+        }
+      }
+      if (!layered) {
+        renderer.render(scene, camera);
+        return;
+      }
+
+      sizeDefocusTargets();
+      defocusLayers.length = 0;
+      ALL_KEYS.forEach((key, i) => {
+        const group = objects[key]!;
+        defocusWasVisible[i] = group.visible;
+        if (!group.visible) return;
+        group.getWorldPosition(cullWorldPos);
+        defocusLayers.push({ key, distance: cullWorldPos.distanceTo(camera.position) });
+      });
+      defocusLayers.sort((a, b) => b.distance - a.distance);
+
+      renderer.autoClear = false;
+
+      // The backdrop, and the only thing that is never defocused: the stars
+      // are not somewhere you are travelling to, they are the room.
+      anchor.visible = false;
+      renderer.setRenderTarget(null);
+      renderer.clear();
+      renderer.render(scene, camera);
+      anchor.visible = true;
+
+      starfield.group.visible = false;
+      const dust = transitDust ? transitDust.object : null;
+      if (dust) dust.visible = false;
+
+      for (const layer of defocusLayers) {
+        ALL_KEYS.forEach((key) => {
+          objects[key]!.visible = key === layer.key;
+        });
+        renderer.setRenderTarget(rtSharp);
+        renderer.clear(true, true, true);
+        renderer.render(scene, camera);
+
+        const blur = blurCurrent[layer.key];
+        let blurred: THREE.Texture = rtSharp!.texture;
+        if (blur > 0.004) {
+          // Sigma is asked for in CSS pixels, so it converts through the
+          // device pixel ratio and then through the target's own scale.
+          const sigma = DEFOCUS_MAX_PX * renderer.getPixelRatio() * DEFOCUS_BLUR_SCALE * blur;
+          // Two separable passes at spacings s and 0.6s compose to a sigma
+          // of about 2.33s; solve back for the spacing that lands on the
+          // sigma asked for.
+          const spacing = Math.max(0.35, sigma / 2.33);
+          quad.material = downsampleMaterial;
+          downsampleMaterial.uniforms.tDiffuse.value = rtSharp!.texture;
+          downsampleMaterial.uniforms.uTexel.value.set(1 / rtPing!.width, 1 / rtPing!.height);
+          renderer.setRenderTarget(rtPing);
+          renderer.clear(true, false, false);
+          renderer.render(quadScene, quadCamera);
+
+          blurPass(rtPing!.texture, rtPong!, spacing * 0.6, true);
+          blurPass(rtPong!.texture, rtPing!, spacing * 0.6, false);
+          blurPass(rtPing!.texture, rtPong!, spacing, true);
+          blurPass(rtPong!.texture, rtPing!, spacing, false);
+          blurred = rtPing!.texture;
+        }
+
+        quad.material = compositeMaterial;
+        compositeMaterial.uniforms.tSharp.value = rtSharp!.texture;
+        compositeMaterial.uniforms.tBlur.value = blurred;
+        compositeMaterial.uniforms.uMix.value = blur > 0.004 ? blur : 0;
+        renderer.setRenderTarget(null);
+        renderer.render(quadScene, quadCamera);
+      }
+
+      ALL_KEYS.forEach((key, i) => {
+        objects[key]!.visible = defocusWasVisible[i];
+      });
+      starfield.group.visible = true;
+      if (dust) dust.visible = true;
+      renderer.setRenderTarget(null);
+      renderer.autoClear = true;
+    }
 
     function animate() {
       clock += 0.016;
@@ -2176,13 +2481,17 @@
 
       ALL_KEYS.forEach((key) => {
         let target: number;
+        let blurTarget: number;
         if (inJourney) {
           const dist = Math.abs(journeyProgress - DEPTH_ORDER.indexOf(key));
           target = THREE.MathUtils.clamp(1 - dist * DIM_FALLOFF, DIM_FLOOR, 1);
+          blurTarget = THREE.MathUtils.smoothstep(dist, DEFOCUS_START, DEFOCUS_FULL);
         } else {
           target = focusKey === null ? 1 : key === focusKey ? 1 : DIM_FLOOR;
+          blurTarget = focusKey === null ? 0 : key === focusKey ? 0 : 1;
         }
         dimCurrent[key] += (target - dimCurrent[key]) * 0.08;
+        blurCurrent[key] += (blurTarget - blurCurrent[key]) * 0.08;
         // Note: no scale normalization here any more. Apparent size is now
         // purely a function of true size and distance, which is the entire
         // point - it's what lets a galaxy read as a galaxy and a probe as a
@@ -2304,12 +2613,12 @@
       photography.coreGlow.material.opacity = 0.42 * dimCurrent.photography;
       } // end if (isDesktop)
 
-      renderer.render(scene, camera);
+      renderFrame();
       requestAnimationFrame(animate);
     }
 
     if (reduceMotion) {
-      renderer.render(scene, camera);
+      renderFrame();
     } else {
       requestAnimationFrame(animate);
     }

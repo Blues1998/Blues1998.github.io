@@ -64,15 +64,30 @@ const menuItems = [
         <div class="home-hero-content">
           <h1 class="home-kicker">Animesh Singh</h1>
 
+          {/* All six names, stacked and scrolled past a fixed line rather
+              than one name swapped in place. The neighbours are dimmed,
+              softened and pushed off the line by the same journey position
+              that drives the camera, so the page says "there is more below
+              this" in its own right instead of relying on the visitor
+              trying a scroll to find out. Only the one on the line is a
+              real target; the rest are inert and out of the accessibility
+              tree, which already has the full list in .home-journey-links
+              below. */}
           <div class="home-journey-readout">
             <span class="home-journey-index" id="home-journey-index" aria-hidden="true">01 / 06</span>
-            <a
-              class="home-journey-label"
-              id="home-journey-label"
-              href={menuItems[0].href}
-              data-cosmos-key={menuItems[0].cosmosKey}
-              data-astro-reload={menuItems[0].hardReload ? true : undefined}
-            >{menuItems[0].label}</a>
+            <div class="home-journey-reel" id="home-journey-reel">
+              {menuItems.map((item, i) => (
+                <a
+                  class="home-journey-label"
+                  data-index={i}
+                  href={item.href}
+                  data-cosmos-key={item.cosmosKey}
+                  data-astro-reload={item.hardReload ? true : undefined}
+                  aria-hidden={i === 0 ? undefined : "true"}
+                  tabindex={i === 0 ? undefined : "-1"}
+                >{item.label}</a>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -232,7 +247,23 @@ const menuItems = [
     color: var(--color-border);
   }
 
+  /* Five rows tall with the live one on the middle line, so the block
+     reserves the space its neighbours occupy instead of letting them
+     float up over the name above. Masked rather than clipped: a hard
+     edge at the top and bottom would read as a scrolling window, and
+     this is meant to read as depth. */
+  .home-journey-reel {
+    position: relative;
+    height: 11rem;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 26%, #000 74%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, #000 26%, #000 74%, transparent 100%);
+  }
+
   .home-journey-label {
+    position: absolute;
+    top: 50%;
+    left: 0;
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
@@ -243,7 +274,16 @@ const menuItems = [
     color: var(--color-text);
     text-decoration: none;
     border-bottom: 1px solid transparent;
+    transform-origin: 0 50%;
+    /* Inert until it is the one on the line. Without this the softened
+       rows above and below are still hit targets, so a click aimed at
+       nothing in particular navigates somewhere unasked. */
+    pointer-events: none;
     transition: color 150ms ease, border-color 150ms ease;
+  }
+
+  .home-journey-label[data-current="true"] {
+    pointer-events: auto;
   }
 
   .home-journey-label::after {
@@ -545,9 +585,9 @@ const menuItems = [
     function wireJourney() {
       try {
         var root = document.getElementById("home-journey");
-        var label = document.getElementById("home-journey-label");
+        var reel = document.getElementById("home-journey-reel");
         var indexEl = document.getElementById("home-journey-index");
-        if (!root || !label || !indexEl) return;
+        if (!root || !reel || !indexEl) return;
         if (root.getAttribute("data-cosmos-wired") === "true") return;
         root.setAttribute("data-cosmos-wired", "true");
 
@@ -575,27 +615,71 @@ const menuItems = [
           return scrollable / (items.length - 1);
         }
 
+        var labels = Array.prototype.slice.call(reel.querySelectorAll(".home-journey-label"));
+
+        // The same dwell curve HomeCosmos.astro drives the camera with, so
+        // the names hold still while the camera is parked and move while it
+        // is actually travelling. A linear read of scroll would have the
+        // list creeping continuously against a view that wasn't moving.
+        var LEG_HOLD_START = 0.42;
+        var LEG_HOLD_END = 0.8;
+
+        function journeyPosition(leg) {
+          var max = items.length - 1;
+          var raw = Math.max(0, Math.min(max, window.scrollY / leg));
+          var i = Math.floor(raw);
+          var f = raw - i;
+          var t = Math.max(0, Math.min(1, (f - LEG_HOLD_START) / (LEG_HOLD_END - LEG_HOLD_START)));
+          return i + t * t * t * (t * (t * 6 - 15) + 10);
+        }
+
         function update() {
-          // Flip the readout at 0.6 of a leg rather than the midpoint:
-          // that's the middle of the camera's actual transit window (the
-          // 0.34-0.86 travel band in HomeCosmos.astro), so the name changes
-          // while you're between objects instead of while still parked.
           var leg = legLength();
           if (leg <= 0) return;
+          var pos = journeyPosition(leg);
+          // Row pitch taken from the rendered line rather than a constant,
+          // so it follows the font size at any viewport without a second
+          // place to keep in sync.
+          var row = labels[0] ? labels[0].offsetHeight : 32;
+          var pitch = row * 1.35;
+
+          labels.forEach(function (el, i) {
+            var d = i - pos;
+            var ad = Math.abs(d);
+            // Legible but plainly not the subject: two pixels of blur on a
+            // word this size still reads at a glance, which is the whole
+            // job - it has to say "Projects" to be an invitation.
+            var blur = Math.min(ad, 2) * 2.2;
+            var fade = ad <= 1 ? 1 - 0.7 * ad : Math.max(0, 0.3 * (1 - (ad - 1) / 1.5));
+            el.style.transform =
+              // Half a row back, not half a pitch: top:50% puts the box's
+              // top edge on the centre line, and it's the text that should
+              // sit on it.
+              "translateY(" + (d * pitch - row / 2).toFixed(2) + "px) scale(" + (1 - Math.min(ad, 2) * 0.06).toFixed(3) + ")";
+            el.style.opacity = fade.toFixed(3);
+            el.style.filter = blur > 0.01 ? "blur(" + blur.toFixed(2) + "px)" : "none";
+          });
+
+          // Flip the readout at 0.6 of a leg rather than the midpoint:
+          // that's the middle of the camera's actual transit window, so the
+          // name changes while you're between objects instead of while
+          // still parked.
           var idx = clampIndex(Math.floor(window.scrollY / leg + 0.4));
           if (idx === lastIndex) return;
           lastIndex = idx;
 
-          var item = items[idx];
           indexEl.textContent = String(idx + 1).padStart(2, "0") + " / " + String(items.length).padStart(2, "0");
-          label.textContent = item.label;
-          label.setAttribute("href", item.href);
-          label.setAttribute("data-cosmos-key", item.cosmosKey);
-          if (item.hardReload) {
-            label.setAttribute("data-astro-reload", "true");
-          } else {
-            label.removeAttribute("data-astro-reload");
-          }
+          labels.forEach(function (el, i) {
+            if (i === idx) {
+              el.setAttribute("data-current", "true");
+              el.removeAttribute("aria-hidden");
+              el.removeAttribute("tabindex");
+            } else {
+              el.removeAttribute("data-current");
+              el.setAttribute("aria-hidden", "true");
+              el.setAttribute("tabindex", "-1");
+            }
+          });
 
           dots.forEach(function (dot, i) {
             if (i === idx) dot.setAttribute("aria-current", "true");
@@ -624,23 +708,29 @@ const menuItems = [
           });
         });
 
-        label.addEventListener("click", function (ev) {
-          if (reduceMotion) return;
-          if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
-          ev.preventDefault();
-          document.dispatchEvent(
-            new CustomEvent("cosmos:warp", {
-              detail: {
-                key: label.getAttribute("data-cosmos-key"),
-                href: label.getAttribute("href"),
-                // Set while the readout is pointing at Playground, which
-                // needs a real document load - it still dives in, it just
-                // can't carry the WebGL context across (see the cosmos:warp
-                // handler in HomeCosmos.astro).
-                reload: label.hasAttribute("data-astro-reload"),
-              },
-            })
-          );
+        // Bound to all six, though only the one on the line can be reached
+        // - the rest are pointer-events:none and out of tab order. Cheaper
+        // and less stateful than rebinding a single handler every time the
+        // active row changes.
+        labels.forEach(function (el) {
+          el.addEventListener("click", function (ev) {
+            if (reduceMotion) return;
+            if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+            ev.preventDefault();
+            document.dispatchEvent(
+              new CustomEvent("cosmos:warp", {
+                detail: {
+                  key: el.getAttribute("data-cosmos-key"),
+                  href: el.getAttribute("href"),
+                  // Set on Playground, which needs a real document load -
+                  // it still dives in, it just can't carry the WebGL
+                  // context across (see the cosmos:warp handler in
+                  // HomeCosmos.astro).
+                  reload: el.hasAttribute("data-astro-reload"),
+                },
+              })
+            );
+          });
         });
       } catch (err) {
         console.error(LOG, "Failed to wire journey navigation.", err);
