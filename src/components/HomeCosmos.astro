@@ -203,6 +203,33 @@
       blendDstAlpha: THREE.OneFactor,
     } as const;
 
+    // The same additive pass, but letting alpha accumulate as well.
+    //
+    // ADDITIVE_RGB_ONLY exists because a large soft surface fading to black
+    // raises destination alpha while contributing almost no colour, which
+    // composites *darker* than the page behind it. Correct for coronas and
+    // haze. Wrong for anything small and bright drawn over empty space: on a
+    // premultiplied, transparent canvas it writes bright RGB onto a pixel
+    // whose alpha stays zero, and RGB greater than alpha is not a legal
+    // premultiplied colour. What happens next is up to the compositor.
+    // Chromium's offscreen capture path keeps the colour, which is why this
+    // survives every headless screenshot; a real display compositor clamps
+    // the colour to the alpha, and alpha is zero, so the pixel is black.
+    //
+    // The visible signature is unmistakable once you know it: the object
+    // only appears where something else has already raised alpha - hugging
+    // a glow, or crossing a planet - and is simply absent everywhere else.
+    // Brightening it cannot help, because the colour was never the problem.
+    const ADDITIVE_WITH_ALPHA = {
+      blending: THREE.CustomBlending,
+      blendEquation: THREE.AddEquation,
+      blendSrc: THREE.SrcAlphaFactor,
+      blendDst: THREE.OneFactor,
+      blendEquationAlpha: THREE.AddEquation,
+      blendSrcAlpha: THREE.OneFactor,
+      blendDstAlpha: THREE.OneFactor,
+    } as const;
+
     // Real astronomical materials: NASA/Solar-System-Scope sourced textures
     // and a real scanned asteroid mesh (see public/textures/cosmos/License.txt
     // and public/models/cosmos/License.txt for sourcing + license, and the
@@ -343,6 +370,22 @@
     // experience (see HomeMenu.astro) and stay desktop-only for this
     // phase - foundation work here is the starfield above, not a mobile
     // redesign of the menu scene.
+    // Set once the framing block below has finished initialising. Model
+    // loads call refreshFraming() from their onLoad, and an onLoad can
+    // land *during* this module's own evaluation when the file comes
+    // straight from cache - the script suspends on its dynamic imports
+    // and the callback runs in the gap. Everything refreshFraming touches
+    // is declared further down, so that call hits the temporal dead zone
+    // and throws; GLTFLoader catches it, reports it as a load failure, and
+    // the model is silently never added. Which is a bug that only appears
+    // on machines fast enough to win the race - a warm cache locally, and
+    // never in a cold-cache test run.
+    //
+    // Skipping the refresh in that window is safe: a model that arrives
+    // that early is already in the scene graph when the initial measuring
+    // pass runs, so it is measured anyway.
+    let framingReady = false;
+
     if (isDesktop) {
     // Marks that the six narrative objects actually exist behind the page,
     // which the scrim rule above needs to distinguish from a starfield-only
@@ -608,7 +651,7 @@
             opacity,
             side: THREE.DoubleSide,
             depthWrite: false,
-            ...ADDITIVE_RGB_ONLY,
+            ...ADDITIVE_WITH_ALPHA,
           }),
         );
       }
@@ -843,7 +886,7 @@
         transparent: true,
         opacity: 0,
         depthWrite: false,
-        ...ADDITIVE_RGB_ONLY,
+        ...ADDITIVE_WITH_ALPHA,
       });
       const coma = new THREE.Sprite(comaMat);
       coma.scale.setScalar(0.05);
@@ -876,7 +919,7 @@
             transparent: true,
             opacity: 0,
             depthWrite: false,
-            ...ADDITIVE_RGB_ONLY,
+            ...ADDITIVE_WITH_ALPHA,
           });
           const sprite = new THREE.Sprite(mat);
           // Hangs off the nucleus down its own -Y; the holder is what gets
@@ -1024,7 +1067,7 @@
         opacity: 0.22,
         side: THREE.DoubleSide,
         depthWrite: false,
-        ...ADDITIVE_RGB_ONLY,
+        ...ADDITIVE_WITH_ALPHA,
       });
       accentTargets.push(discMat.color);
       const DISC_INNER = 0.22;
@@ -1035,7 +1078,10 @@
         // ring drawn at flat opacity ends in a hard circular cut, which is
         // the one thing a cloud of infalling plasma definitely does not do.
         const pos = discGeo.attributes.position;
-        const cols = new Float32Array(pos.count * 3);
+        // RGBA, so alpha fades with the colour - see the note on the beam
+        // ramp. Fading colour alone leaves the rim writing coverage with no
+        // colour in it, which composites as a dark ring.
+        const cols = new Float32Array(pos.count * 4);
         const v = new THREE.Vector3();
         for (let i = 0; i < pos.count; i++) {
           v.fromBufferAttribute(pos, i);
@@ -1044,11 +1090,12 @@
           // and turned the entire colour buffer into NaN.
           const t = THREE.MathUtils.clamp((v.length() - DISC_INNER) / (DISC_OUTER - DISC_INNER), 0, 1);
           const b = Math.pow(1 - t, 1.9);
-          cols[i * 3] = b;
-          cols[i * 3 + 1] = b;
-          cols[i * 3 + 2] = b;
+          cols[i * 4] = b;
+          cols[i * 4 + 1] = b;
+          cols[i * 4 + 2] = b;
+          cols[i * 4 + 3] = b;
         }
-        discGeo.setAttribute("color", new THREE.BufferAttribute(cols, 3));
+        discGeo.setAttribute("color", new THREE.BufferAttribute(cols, 4));
       }
       const disc = new THREE.Mesh(discGeo, discMat);
       disc.rotation.x = Math.PI / 2;
@@ -1074,7 +1121,12 @@
         // single-segment cone could only fade between its two ends.
         const geo = new THREE.ConeGeometry(radius, height, 28, 16, true);
         const pos = geo.attributes.position;
-        const colors = new Float32Array(pos.count * 3);
+        // Four components, not three. The blend accumulates alpha as well as
+        // colour (see ADDITIVE_WITH_ALPHA), so alpha has to follow the same
+        // ramp - otherwise the faded end of the beam writes full coverage
+        // with no colour in it, which is premultiplied black, and the beam
+        // ends in a dark smear over the page instead of in nothing.
+        const colors = new Float32Array(pos.count * 4);
         for (let i = 0; i < pos.count; i++) {
           // 1 at the apex, which sits against the star; 0 at the open end.
           // Clamped before the pow: the generated vertices land a hair
@@ -1083,11 +1135,12 @@
           // colour buffer and renders as garbage rather than as nothing.
           const t = THREE.MathUtils.clamp((pos.getY(i) + height / 2) / height, 0, 1);
           const v = Math.pow(t, 2.4);
-          colors[i * 3] = v;
-          colors[i * 3 + 1] = v;
-          colors[i * 3 + 2] = v;
+          colors[i * 4] = v;
+          colors[i * 4 + 1] = v;
+          colors[i * 4 + 2] = v;
+          colors[i * 4 + 3] = v;
         }
-        geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+        geo.setAttribute("color", new THREE.BufferAttribute(colors, 4));
         return geo;
       }
       const beamMat = new THREE.MeshBasicMaterial({
@@ -1097,7 +1150,7 @@
         opacity: 0.55,
         side: THREE.DoubleSide,
         depthWrite: false,
-        ...ADDITIVE_RGB_ONLY,
+        ...ADDITIVE_WITH_ALPHA,
       });
       accentTargets.push(beamMat.color);
       const beamGeo = makeBeamGeometry(0.26, BEAM_LENGTH);
@@ -1509,6 +1562,11 @@
       hazeGeo.setAttribute("position", new THREE.BufferAttribute(hazePositions, 3));
       const hazeColorAttr = new THREE.BufferAttribute(hazeColors, 3);
       hazeGeo.setAttribute("color", hazeColorAttr);
+      // Left on the RGB-only blend on purpose, unlike the other additive
+      // surfaces. This one genuinely does fade to black across its own
+      // vertex colours, which is the case RGB-only exists for, and it is
+      // drawn on top of the galaxy's own point cloud rather than over empty
+      // space - so there is already alpha underneath it to composite against.
       const hazeMat = new THREE.PointsMaterial({
         size: 0.1 * OBJECT_LAYOUT.photography.scale,
         map: glowTexture,
@@ -1610,11 +1668,13 @@
     // placeholder that was standing in - correct only by coincidence, and
     // silently wrong the moment either model's target size is touched.
     function refreshFraming(key: CosmosKey) {
+      if (!framingReady) return;
       measureExtent(key);
       placeObjects();
     }
 
     (Object.keys(objects) as CosmosKey[]).forEach(measureExtent);
+    framingReady = true;
 
     // Distance at which `frame` of the viewport is filled by the object,
     // in whichever axis is the tighter constraint. Recomputed rather than
