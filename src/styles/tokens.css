@@ -5,8 +5,19 @@
      values, promoted to the base tokens rather than left as an override. */
   --color-bg: #0f1117;
   --color-text: #e2e4e9;
-  --color-muted: #8b8e96;
+  /* Was #8b8e96, which is 5.8:1 on the background - fine for a site whose
+     background is a colour, and thin for one whose background is a moving
+     image. Every remaining contrast failure measured against the live scene
+     was a 13px element in this colour, whichever one the pulsar's beam or
+     the probe's dish happened to be sweeping past. 7.0:1 leaves enough room
+     that the scene can do what it likes behind them. */
+  --color-muted: #9a9da5;
   --color-accent: #7c8aff;
+  /* The accent, lifted for small text. #7c8aff is 6.3:1 on the background,
+     which is comfortable at link size and not at 13px over a live scene -
+     and the accent is used for exactly the smallest things on the page: the
+     journey index, the list counters. 9.0:1 instead. */
+  --color-accent-bright: #a3adff;
   --color-border: rgba(255, 255, 255, 0.08);
 
   /* One step between --color-text and --color-muted, for prose that is

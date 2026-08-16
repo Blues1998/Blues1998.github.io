@@ -25,17 +25,23 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     align-items: flex-start;
   }
 
+  /* Was --color-muted at 0.3 opacity, which on a flat background is a
+     tasteful ghost and over the nebula this route actually parks in front
+     of is close to invisible. It stays quiet - it is a numeral, not a
+     message - but quiet by being small-tracked rather than nearly
+     transparent. */
   .not-found h1 {
-    font-size: 6rem;
+    font-family: var(--font-mono);
+    font-size: clamp(3.5rem, 2rem + 7vw, 6rem);
+    letter-spacing: var(--track-title);
     line-height: 1;
-    margin-bottom: var(--space-2);
+    margin-bottom: var(--space-3);
     color: var(--color-muted);
-    opacity: 0.3;
   }
 
   .not-found p {
     font-size: var(--font-size-lg);
-    color: var(--color-muted);
+    color: var(--color-text-soft);
     margin-bottom: var(--space-4);
   }
 </style>

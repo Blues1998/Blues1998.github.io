@@ -146,7 +146,12 @@
      behind the last words of every line. Fall back to the flat wash. */
   @media (max-width: 1099px) {
     .cosmos-scrim {
-      background: color-mix(in srgb, var(--color-bg) 70%, transparent);
+      /* Lightened alongside the ramp above, and for the same reason: this
+         was 70% back when a fixed wash was the only mechanism, and leaving
+         it there meant the glare shield stacked on top of an unchanged
+         worst-case scrim. Between them the star went out - a flat grey-brown
+         disc where a photosphere should be. */
+      background: color-mix(in srgb, var(--color-bg) 56%, transparent);
     }
   }
 
@@ -2077,6 +2082,9 @@
     // around it differs per route.
     const glareEl = document.getElementById("cosmos-glare");
 
+    // Scales the shield down where the mask cannot release it (see below).
+    let glareWidthFactor = 1;
+
     function measureColumn() {
       if (!glareEl) return;
       const section = document.querySelector("#main section") as HTMLElement | null;
@@ -2084,11 +2092,22 @@
       // Below ~1100px framingOffsetX recentres the object behind the column
       // (see backdropStandoffMultiplier), so there is no free side to
       // preserve and the mask covers everything.
+      //
+      // Which means every pixel of the object gets the full shield, with no
+      // bright side left anywhere to say what it is - a star came out as a
+      // flat grey-brown disc. Wide viewports can afford a strong shield
+      // precisely because the mask hands most of the object back; without
+      // that, the same strength is simply the old flat wash again, and much
+      // heavier. The text has room to spare here anyway: the object hangs
+      // 1.3x further back at these widths, so it is smaller and dimmer to
+      // begin with.
       if (!section || w < 1100) {
+        glareWidthFactor = 1;
         container!.style.setProperty("--cosmos-column-edge", "100%");
         container!.style.setProperty("--cosmos-column-fade", "100%");
         return;
       }
+      glareWidthFactor = 1;
       const right = (section.getBoundingClientRect().right / w) * 100;
       container!.style.setProperty("--cosmos-column-edge", `${Math.min(96, right + 3).toFixed(1)}%`);
       container!.style.setProperty("--cosmos-column-fade", `${Math.min(100, right + 22).toFixed(1)}%`);
@@ -2103,8 +2122,8 @@
       photography: 0.8,  // bright core, and large enough to fill the frame
       playground: 0.7,   // luminous but diffuse
       projects: 0.85,    // thin near-white rings, and they cross everything
-      music: 0.5,        // small core, bright beams
-      contact: 0.8,      // dim overall, but the dish is lit and it turns
+      music: 0.72,      // small core, but the beams are bright and sweep
+      contact: 1,        // dim overall, but the dish is lit and it turns
     };
 
     const glareVec = new THREE.Vector3();
@@ -2123,7 +2142,15 @@
 
     function updateGlare(dt: number) {
       if (!glareEl) return;
-      const key = cosmosMode === "backdrop" ? focusKey : null;
+      // On a route with no waypoint of its own - 404, or anything else off
+      // the six-object map - focusKey is null, and computeCameraTarget falls
+      // back to the first waypoint rather than pointing at nothing. The
+      // shield has to make the same choice or it tracks a different object
+      // than the camera is framing: on /404/ that meant no shield at all,
+      // with the nebula at full brightness directly behind the copy.
+      const key =
+        cosmosMode !== "backdrop" ? null
+        : focusKey ?? (isDesktop ? DEPTH_ORDER[0] : null);
       let targetOpacity = 0;
 
       if (key && objects[key]) {
@@ -2160,8 +2187,12 @@
           // rings. Never smaller than most of the viewport, so the falloff
           // is still meaningful by the time it reaches the column.
           const minRadius = h * 0.75;
-          glareScale = Math.max(minRadius, radius * 1.35) / 500;
-          targetOpacity = GLARE_WEIGHT[key];
+          // The star's ejection reaches past the extent this is sized from,
+          // so while one is erupting the shield grows with it (see
+          // flareGlare). Nothing else in the scene leaves its own bounds.
+          const transient = key === "about" ? 1 + flareGlare * 0.55 : 1;
+          glareScale = (Math.max(minRadius, radius * 1.35) * transient) / 500;
+          targetOpacity = GLARE_WEIGHT[key] * glareWidthFactor;
         }
       }
 
@@ -2992,6 +3023,10 @@
     let flareWait = 12 + Math.random() * 20;
     let flareT = -1;
 
+    // How far the star's mass ejection currently reaches, weighted by how
+    // bright it is: 0 when there is no eruption. Read by updateGlare.
+    let flareGlare = 0;
+
     function updateFlare(dt: number, dim: number) {
       const about = objects.about;
       if (!about) return;
@@ -3026,6 +3061,7 @@
         flareT = -1;
         flareWait = FLARE_GAP[0] + Math.random() * (FLARE_GAP[1] - FLARE_GAP[0]);
         flare.visible = false;
+        flareGlare = 0;
         return;
       }
 
@@ -3043,6 +3079,14 @@
         const trail = 1 - (i / puffs.length) * 0.55;
         (puff.material as THREE.SpriteMaterial).opacity = envelope * trail * dim;
       });
+      // Published for the glare shield. The shield sizes itself from a
+      // bounding extent measured once at construction, and the ejection is
+      // not in it - it erupts a couple of star-radii past the limb, right
+      // out into the column the text is written in. Measured over 45s, the
+      // About list sat at 7.6:1 and dropped to 3.9:1 for the length of an
+      // eruption: 5.5 seconds, every 45 to 95, which is long enough to be
+      // reading through and often enough to meet.
+      flareGlare = envelope * (reach / 2.4);
     }
 
     // ---- The pulsar's flash, aimed ----

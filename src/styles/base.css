@@ -106,18 +106,18 @@ small {
   font-weight: 500;
   letter-spacing: var(--track-wide);
   text-transform: uppercase;
-  /* Not --color-muted. A 13px label has to survive whatever the scene puts
-     behind it, and muted starts with only 5.8:1 of headroom on a flat
-     background - so any glare at all pushes it under the 4.5:1 line, which
-     is how this measured 3.6:1 over the galaxy's halo. At soft it starts
-     from 10:1 and still reads as secondary, because size and tracking are
-     what rank it, not dimness. */
-  color: var(--color-text-soft);
+  /* Full brightness, which for a label reads as a decision rather than an
+     oversight only because size and tracking are what rank it here, not
+     dimness. It started at --color-muted and then --color-text-soft, and
+     both kept dipping under 4.5:1 whenever the galaxy's halo or the
+     pulsar's beam swept behind this corner of the page - a fixed element
+     that small, over a scene that moves, needs the headroom. */
+  color: var(--color-text);
   margin: 0 0 var(--space-3);
 }
 
 .page-kicker .page-kicker-index {
-  color: var(--color-accent);
+  color: var(--color-accent-bright);
 }
 
 /* Metadata: durations, counts, tech, credits. Anything the page states
@@ -161,8 +161,7 @@ small {
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   letter-spacing: 0.08em;
-  color: var(--color-accent);
-  opacity: 0.75;
+  color: var(--color-accent-bright);
 }
 
 .signals li strong {
@@ -217,6 +216,30 @@ section {
   margin-left: auto;
   margin-right: auto;
   margin-bottom: var(--space-6);
+}
+
+/* Section rhythm.
+   A flat --space-6 between every section says every gap means the same
+   thing, and they don't: About ends on a single trailing sentence that is
+   an aside to what came before, and it was given exactly the same break as
+   the jump from "How I work" to "Currently exploring". A section that opens
+   with a heading is a new topic and earns the full break; one that doesn't
+   is a continuation and gets the smaller one. Adjacent margins collapse, so
+   the larger of the two always wins at the boundary.
+
+   Scoped to data-arrive, which is server-rendered onto <main> for exactly
+   the content routes this is about - not the homepage scroll track, not the
+   full-screen playground pages, both of which set their own spacing. */
+main[data-arrive] > section {
+  margin-bottom: var(--space-4);
+}
+
+main[data-arrive] > section:has(> h1, > h2, > h3) {
+  margin-top: var(--space-6);
+}
+
+main[data-arrive] > section:first-child {
+  margin-top: 0;
 }
 
 /* ---------- Media ---------- */
