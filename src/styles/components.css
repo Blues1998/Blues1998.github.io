@@ -192,8 +192,8 @@ footer {
 }
 
 .button:hover {
-  background-color: rgba(85, 99, 222, 0.06);
-  border-color: rgba(85, 99, 222, 0.25);
+  background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
   text-decoration: none;
 }
 
@@ -230,7 +230,9 @@ footer {
   font-size: var(--font-size-xs);
   letter-spacing: var(--track-wide);
   text-transform: uppercase;
-  color: var(--color-muted);
+  /* Same reasoning as .page-kicker: muted has too little headroom for a
+     13px label sitting over the probe's lit dish. */
+  color: var(--color-text-soft);
 }
 
 .channel-value {
@@ -308,17 +310,21 @@ footer {
   font-weight: 500;
   letter-spacing: 0.06em;
   border-radius: 999px;
-  background: rgba(85, 99, 222, 0.08);
+  /* Enough fill to be a base of its own. At 8% the pill was effectively
+     transparent, so the accent text was competing directly with whatever
+     the scene put behind it - over the solar system's orbit rings that
+     measured 3.2:1 against a 4.5:1 requirement. */
+  background: color-mix(in srgb, var(--color-bg) 92%, var(--color-accent) 8%);
   color: var(--color-accent);
-  border: 1px solid rgba(85, 99, 222, 0.15);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
   cursor: default;
   transition: background var(--transition-fast),
     border-color var(--transition-fast);
 }
 
 .tech-badge:hover {
-  background: rgba(85, 99, 222, 0.15);
-  border-color: rgba(85, 99, 222, 0.3);
+  background: color-mix(in srgb, var(--color-bg) 84%, var(--color-accent) 16%);
+  border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
 }
 
 /* Filterable tech badges (projects page) */
@@ -329,8 +335,12 @@ footer {
 
 .tech-badge.filterable.active {
   background: var(--color-accent);
-  color: #fff;
+  /* Was #fff, which is 3.0:1 on this accent - below AA for 13px text, and
+     the selected filter is the one row on the page that most needs to be
+     readable. Dark on accent instead: 6.3:1, and it reads as pressed. */
+  color: var(--color-bg);
   border-color: var(--color-accent);
+  font-weight: 600;
 }
 
 /* Project card hidden during filter */
@@ -339,11 +349,28 @@ footer {
 }
 
 /* Filter bar */
+.project-toolbar {
+  margin-bottom: var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--surface);
+  backdrop-filter: blur(var(--surface-blur));
+  -webkit-backdrop-filter: blur(var(--surface-blur));
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+}
+
+.project-toolbar .project-overview {
+  margin: 0 0 var(--space-2);
+}
+
+.project-toolbar .filter-bar:last-child {
+  margin-bottom: 0;
+}
+
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin-bottom: var(--space-4);
   align-items: center;
 }
 

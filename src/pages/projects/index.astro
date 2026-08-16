@@ -17,20 +17,31 @@ const allTech = [...new Set(projects.flatMap((p) => p.tech))].sort();
     <p class="page-kicker"><span class="page-kicker-index">02</span> / 06</p>
     <h1>Projects</h1>
 
-    <p class="project-overview">
-      {projects.length} selected {projects.length === 1 ? "project" : "projects"}
-    </p>
+    {/* Count and filters share one strip. Both are chrome for the grid
+        rather than page content, and both sat directly on the scene where
+        the solar system's near-white orbit rings cross - which measured
+        1.3:1 against a 4.5:1 requirement. The adaptive shield behind the
+        page cannot reach that case: it is a radial pool centred on the
+        object, and these rings are thin bright lines spanning the entire
+        frame, so there is no centre for it to sit on. A control group
+        belongs on a surface anyway, which is what the cards below already
+        do. */}
+    <div class="project-toolbar">
+      <p class="project-overview">
+        {projects.length} selected {projects.length === 1 ? "project" : "projects"}
+      </p>
 
-    {allTech.length > 0 && (
-      <div class="filter-bar" id="filter-bar">
-        <span class="filter-label">Filter:</span>
-        {allTech.map((t) => (
-          <button class="tech-badge filterable" data-tech={t} type="button">
-            {t}
-          </button>
-        ))}
-      </div>
-    )}
+      {allTech.length > 0 && (
+        <div class="filter-bar" id="filter-bar">
+          <span class="filter-label">Filter:</span>
+          {allTech.map((t) => (
+            <button class="tech-badge filterable" data-tech={t} type="button">
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
 
     <div class="project-grid" id="project-grid">
       {projects.map((p) => (

@@ -22,6 +22,7 @@
 <div class="home-cosmos" id="home-cosmos" aria-hidden="true" data-cosmos-mode="hero" transition:persist transition:name="cosmos-scene">
   <canvas id="home-cosmos-canvas"></canvas>
   <div class="cosmos-scrim"></div>
+  <div class="cosmos-glare-mask"><div class="cosmos-glare" id="cosmos-glare"></div></div>
 </div>
 
 <style>
@@ -53,19 +54,91 @@
      route on every astro:page-load (never from a template conditional on
      this element - see the transition:persist note in the frontmatter
      comment above: this node is never re-rendered by Astro after the first
-     paint, only ever updated by client JS). */
+     paint, only ever updated by client JS).
+
+     Much lighter than it was (62/60/34/6%), because it is no longer the only
+     thing carrying legibility - see .cosmos-glare below. A fixed wash strong
+     enough for the worst case is by definition too strong for every other
+     case, and this one was set for the worst: text crossing the sun's limb,
+     which measured 1.4:1 against a 4.5:1 requirement. It failed there anyway
+     and flattened the scene everywhere else to do it. */
   .cosmos-scrim {
     position: absolute;
     inset: 0;
     background: linear-gradient(
       to right,
-      color-mix(in srgb, var(--color-bg) 62%, transparent) 0%,
-      color-mix(in srgb, var(--color-bg) 60%, transparent) 70%,
-      color-mix(in srgb, var(--color-bg) 34%, transparent) 86%,
-      color-mix(in srgb, var(--color-bg) 6%, transparent) 100%
+      color-mix(in srgb, var(--color-bg) 40%, transparent) 0%,
+      color-mix(in srgb, var(--color-bg) 38%, transparent) 70%,
+      color-mix(in srgb, var(--color-bg) 20%, transparent) 86%,
+      color-mix(in srgb, var(--color-bg) 4%, transparent) 100%
     );
     opacity: 0;
     transition: opacity 500ms ease;
+  }
+
+  /* ---------- Adaptive glare shield ----------
+     The scrim above is a fixed gradient: it does not know where the object
+     is, so it darkens the empty left margin exactly as hard as the patch of
+     sun a paragraph is written across. This is the half that knows.
+
+     A soft radial darkening is parked on the focused object's own projected
+     position and sized to its projected radius, then masked to the reading
+     column - so it only ever paints where text and object actually overlap,
+     and the object's free side stays at full brightness. Sun behind the
+     prose: the text sits in a pool of shade that follows it. Probe out in
+     the right margin: the mask clips the whole thing away and nothing is
+     dimmed at all.
+
+     Position and size come from HomeCosmos's own camera each frame, via
+     transform and opacity only - both compositor properties, so this costs
+     no layout and no repaint however fast the camera is moving. */
+  .cosmos-glare-mask {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 500ms ease;
+    /* Where the content column ends, measured from the real <section> on
+       resize and navigation (see measureColumn below). Past the fade stop
+       the shield does not exist, which is what keeps this from becoming
+       another full-width wash. */
+    -webkit-mask-image: linear-gradient(
+      to right,
+      #000 0%,
+      #000 var(--cosmos-column-edge, 74%),
+      transparent var(--cosmos-column-fade, 94%)
+    );
+    mask-image: linear-gradient(
+      to right,
+      #000 0%,
+      #000 var(--cosmos-column-edge, 74%),
+      transparent var(--cosmos-column-fade, 94%)
+    );
+  }
+
+  .home-cosmos[data-cosmos-mode="backdrop"] .cosmos-glare-mask {
+    opacity: 1;
+  }
+
+  /* A unit disc, scaled and translated into place. 1000px across so the
+     gradient is rasterized at a useful resolution before being scaled -
+     a small element blown up several times over bands visibly. */
+  .cosmos-glare {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1000px;
+    height: 1000px;
+    margin: -500px 0 0 -500px;
+    opacity: 0;
+    background: radial-gradient(
+      closest-side,
+      color-mix(in srgb, var(--color-bg) 94%, transparent) 0%,
+      color-mix(in srgb, var(--color-bg) 82%, transparent) 40%,
+      color-mix(in srgb, var(--color-bg) 40%, transparent) 72%,
+      transparent 100%
+    );
+    will-change: transform, opacity;
   }
 
   /* Narrow viewports have no right margin to spare - the content column
@@ -1995,6 +2068,128 @@
       rtPong!.setSize(bw, bh);
     }
 
+    // ---- Adaptive glare shield ----
+    //
+    // Where the reading column ends, as a percentage of the viewport, so the
+    // shield below can be masked to it. Measured from the page's real
+    // <section> rather than derived from --max-width: that token is in ch,
+    // which resolves against whatever font actually loaded, and the padding
+    // around it differs per route.
+    const glareEl = document.getElementById("cosmos-glare");
+
+    function measureColumn() {
+      if (!glareEl) return;
+      const section = document.querySelector("#main section") as HTMLElement | null;
+      const w = window.innerWidth;
+      // Below ~1100px framingOffsetX recentres the object behind the column
+      // (see backdropStandoffMultiplier), so there is no free side to
+      // preserve and the mask covers everything.
+      if (!section || w < 1100) {
+        container!.style.setProperty("--cosmos-column-edge", "100%");
+        container!.style.setProperty("--cosmos-column-fade", "100%");
+        return;
+      }
+      const right = (section.getBoundingClientRect().right / w) * 100;
+      container!.style.setProperty("--cosmos-column-edge", `${Math.min(96, right + 3).toFixed(1)}%`);
+      container!.style.setProperty("--cosmos-column-fade", `${Math.min(100, right + 22).toFixed(1)}%`);
+    }
+
+    // How much light each object actually throws at the page. A sun behind a
+    // paragraph and a grey spacecraft behind the same paragraph are not the
+    // same problem, and shading them equally would mean either under-serving
+    // the sun or pointlessly dimming the probe.
+    const GLARE_WEIGHT: Record<CosmosKey, number> = {
+      about: 0.78,     // a photospheric disc; the worst case by a distance
+      photography: 0.8,  // bright core, and large enough to fill the frame
+      playground: 0.7,   // luminous but diffuse
+      projects: 0.85,    // thin near-white rings, and they cross everything
+      music: 0.5,        // small core, bright beams
+      contact: 0.8,      // dim overall, but the dish is lit and it turns
+    };
+
+    const glareVec = new THREE.Vector3();
+    // Live values, and the last ones actually written to the element - an
+    // unchanged frame writes nothing at all. In backdrop mode the camera is
+    // parked and only sways with the pointer, so this skips most frames.
+    let glareX = 0;
+    let glareY = 0;
+    let glareScale = 1;
+    let glareOpacity = 0;
+    let glareWritten = false;
+    let glareLastX = 0;
+    let glareLastY = 0;
+    let glareLastScale = 1;
+    let glareLastOpacity = 0;
+
+    function updateGlare(dt: number) {
+      if (!glareEl) return;
+      const key = cosmosMode === "backdrop" ? focusKey : null;
+      let targetOpacity = 0;
+
+      if (key && objects[key]) {
+        objects[key]!.getWorldPosition(glareVec);
+        const distance = camera.position.distanceTo(glareVec);
+        const extent = objectExtent[key];
+        glareVec.project(camera);
+        // z > 1 means behind the camera or past the far plane, where the
+        // projected x/y are meaningless (and mirrored).
+        if (distance > 0 && extent && glareVec.z <= 1) {
+          const w = window.innerWidth;
+          const h = window.innerHeight;
+          glareX = (glareVec.x * 0.5 + 0.5) * w;
+          glareY = (-glareVec.y * 0.5 + 0.5) * h;
+          // The wider of the two axes, because what needs shading is the
+          // object's whole bright footprint - the solar system's rings
+          // spread far wider than they are tall, and it is the rings that
+          // cut through the text.
+          const halfExtent = Math.max(extent.x, extent.y) / 2;
+          const halfFovTan = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+          const radius = (halfExtent * h) / (2 * distance * halfFovTan);
+          // 1.35 so the shade reaches a little past the object itself: a
+          // hard-edged pool exactly the size of the sun would put its own
+          // boundary through the middle of a line of text.
+          //
+          // The floor matters more than it looks. A radial pool centred on
+          // the object assumes the object's light is concentrated there,
+          // which is true of a star and false of the two extended ones: the
+          // solar system is thin bright rings spanning the whole frame, and
+          // the galaxy has a halo well outside its core. For those, the
+          // brightness a reader meets is far from the centre the shield is
+          // parked on, and a tightly-sized pool leaves it uncovered - which
+          // is exactly where the filter bar measured 1.1:1 against the
+          // rings. Never smaller than most of the viewport, so the falloff
+          // is still meaningful by the time it reaches the column.
+          const minRadius = h * 0.75;
+          glareScale = Math.max(minRadius, radius * 1.35) / 500;
+          targetOpacity = GLARE_WEIGHT[key];
+        }
+      }
+
+      // Eased, so arriving on a route fades the shade in with the camera
+      // rather than stamping it on at full strength the moment focusKey is
+      // assigned. Position and size are *not* eased - they follow the object
+      // exactly, because a shadow that lags the thing casting it is a shadow
+      // you can see moving.
+      glareOpacity += (targetOpacity - glareOpacity) * easeFactor(0.08, dt);
+
+      if (
+        !glareWritten ||
+        Math.abs(glareX - glareLastX) > 1 ||
+        Math.abs(glareY - glareLastY) > 1 ||
+        Math.abs(glareScale - glareLastScale) > 0.004 ||
+        Math.abs(glareOpacity - glareLastOpacity) > 0.004
+      ) {
+        glareEl.style.transform =
+          `translate3d(${glareX.toFixed(1)}px, ${glareY.toFixed(1)}px, 0) scale(${glareScale.toFixed(3)})`;
+        glareEl.style.opacity = glareOpacity.toFixed(3);
+        glareWritten = true;
+        glareLastX = glareX;
+        glareLastY = glareY;
+        glareLastScale = glareScale;
+        glareLastOpacity = glareOpacity;
+      }
+    }
+
     function resize() {
       const rect = container!.getBoundingClientRect();
       const w = rect.width || 1;
@@ -2004,6 +2199,7 @@
       camera.updateProjectionMatrix();
       if (rtLayer) sizeDefocusTargets();
       placeObjects();
+      measureColumn();
     }
     resize();
     window.addEventListener("resize", resize);
@@ -2498,6 +2694,10 @@
       const path = normalizedPath().replace(/\/+$/, "");
       cosmosMode = path === "" ? "hero" : "backdrop";
       container!.dataset.cosmosMode = cosmosMode;
+      // <main> has just been swapped, so the column this route actually
+      // renders - and therefore how much of the viewport the glare shield is
+      // allowed to cover - is only knowable now.
+      measureColumn();
       // Releasing the dive here rather than on a timer is what makes the
       // arrival read as one continuous move: the camera is deep inside the
       // object's space at this instant, and simply handing the rig a normal
@@ -2554,7 +2754,14 @@
       cameraRig.setTarget(framedTarget, standoff);
       cameraRig.snapToTarget();
       starfield.group.position.copy(camera.position);
-      if (instant) renderFrame();
+      if (instant) {
+        // A whole second of easing in one call, which settles the shield's
+        // fade completely. Reduced motion never runs animate(), so this is
+        // the only chance it gets - without it those visitors keep the text
+        // over the sun and none of the shade.
+        updateGlare(1);
+        renderFrame();
+      }
     }
     // Fires on the first load and on every subsequent client-side
     // navigation alike once <ClientRouter /> is active in BaseLayout; a
@@ -3024,6 +3231,8 @@
       // Stars are the one thing that should never fall behind: the camera
       // travels ~7800 units, far outside the fixed shells they're built on,
       // so the whole field rides along and surrounds the viewer throughout.
+      updateGlare(dt);
+
       starfield.group.position.copy(camera.position);
       starfield.update(dt, tiltX, tiltY);
       skyEvents.update(dt, standoff, camera.position);

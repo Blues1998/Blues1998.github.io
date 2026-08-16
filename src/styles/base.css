@@ -106,7 +106,13 @@ small {
   font-weight: 500;
   letter-spacing: var(--track-wide);
   text-transform: uppercase;
-  color: var(--color-muted);
+  /* Not --color-muted. A 13px label has to survive whatever the scene puts
+     behind it, and muted starts with only 5.8:1 of headroom on a flat
+     background - so any glare at all pushes it under the 4.5:1 line, which
+     is how this measured 3.6:1 over the galaxy's halo. At soft it starts
+     from 10:1 and still reads as secondary, because size and tracking are
+     what rank it, not dimness. */
+  color: var(--color-text-soft);
   margin: 0 0 var(--space-3);
 }
 
