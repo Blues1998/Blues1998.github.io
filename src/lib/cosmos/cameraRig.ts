@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { REFERENCE_STEP, easeFactor } from "./timing";
 
 // Small reusable camera-easing abstraction: something wants the camera to
 // look at a point from a given distance, this eases toward it every frame
@@ -11,7 +12,10 @@ import * as THREE from "three";
 export interface CameraRig {
   setTarget(lookAt: THREE.Vector3, distance: number): void;
   snapToTarget(): void;
-  update(ease?: number): void;
+  // `ease` stays expressed per 60Hz frame - the units every caller already
+  // thinks in - and is reshaped here for the frame that actually happened,
+  // so the approach takes the same wall-clock time on any display.
+  update(ease?: number, dt?: number): void;
 }
 
 export function createCameraRig(camera: THREE.PerspectiveCamera, defaultEase = 0.06): CameraRig {
@@ -41,9 +45,10 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, defaultEase = 0
       currentZ = targetZ;
       apply();
     },
-    update(ease = defaultEase) {
-      currentLookAt.lerp(targetLookAt, ease);
-      currentZ += (targetZ - currentZ) * ease;
+    update(ease = defaultEase, dt = REFERENCE_STEP) {
+      const k = easeFactor(ease, dt);
+      currentLookAt.lerp(targetLookAt, k);
+      currentZ += (targetZ - currentZ) * k;
       apply();
     },
   };

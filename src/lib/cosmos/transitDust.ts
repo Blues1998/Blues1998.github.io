@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { easeFactor } from "./timing";
 
 // Foreground particulate that streaks past the camera while it travels
 // between waypoints, so motion is something you *see* rather than only
@@ -24,7 +25,7 @@ import * as THREE from "three";
 // which is what you want for distant dust anyway.
 export interface TransitDust {
   object: THREE.Object3D;
-  update(cameraDeltaZ: number, standoff: number, cameraPos: THREE.Vector3): void;
+  update(cameraDeltaZ: number, standoff: number, cameraPos: THREE.Vector3, dt: number): void;
   dispose(): void;
 }
 
@@ -68,7 +69,7 @@ export function createTransitDust(count: number, accent: THREE.Color): TransitDu
 
   return {
     object: lines,
-    update(cameraDeltaZ, standoff, cameraPos) {
+    update(cameraDeltaZ, standoff, cameraPos, dt) {
       if (standoff <= 0) return;
       // Travel expressed in the field's own normalized units, so a given
       // scroll feels like the same amount of streaking at every scale.
@@ -86,7 +87,9 @@ export function createTransitDust(count: number, accent: THREE.Color): TransitDu
       // waypoint; the brief here is foreground particulate you register at
       // the edge of vision, not a hyperspace transition.
       const targetOpacity = Math.min(0.16, speed * 3);
-      opacity += (targetOpacity - opacity) * 0.15;
+      // The travel above is already a real per-frame camera delta and so
+      // needs no correction; this fade is a per-frame constant and does.
+      opacity += (targetOpacity - opacity) * easeFactor(0.15, dt);
       material.opacity = opacity;
 
       // Short dashes rather than full-box smears, for the same reason.

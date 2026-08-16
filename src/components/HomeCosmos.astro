@@ -104,6 +104,7 @@
   import { createStarfield } from "../lib/cosmos/starfield";
   import { createCameraRig } from "../lib/cosmos/cameraRig";
   import { createTransitDust, type TransitDust } from "../lib/cosmos/transitDust";
+  import { MAX_STEP, easeFactor } from "../lib/cosmos/timing";
 
   const LOG = "[HomeCosmos]";
 
@@ -1949,6 +1950,9 @@
     let targetTiltX = 0;
     let targetTiltY = 0;
     let clock = 0;
+    // rAF's own timestamp, so the first frame after a tab regains focus is
+    // measured from the frame that actually preceded it.
+    let prevFrameTime = 0;
     let prevCameraZ = camera.position.z;
 
     // ---- Hover/focus choreography: HomeMenu dispatches cosmos:focus /
@@ -2575,22 +2579,30 @@
       renderer.autoClear = true;
     }
 
-    function animate() {
-      clock += 0.016;
+    function animate(now: number) {
+      // Real elapsed time, clamped (see timing.ts). Everything below that
+      // used to be a per-frame constant is expressed against this, so the
+      // scene runs at the same speed on a 60Hz panel, a 120Hz ProMotion
+      // display and a machine struggling at 30.
+      const dt = prevFrameTime === 0 ? 1 / 60 : Math.min(MAX_STEP, (now - prevFrameTime) / 1000);
+      prevFrameTime = now;
+      clock += dt;
       const inJourney = journeyActive();
       const journeyProgress = inJourney ? journeyDepthProgress() : 0;
       // The pair of waypoints the current leg runs between - the only two
       // objects that are ever deliberately being looked at mid-journey.
       const journeyFrom = Math.floor(journeyProgress);
       const journeyTo = Math.min(journeyFrom + 1, DEPTH_ORDER.length - 1);
-      tiltX += (targetTiltX - tiltX) * 0.05;
-      tiltY += (targetTiltY - tiltY) * 0.05;
+      const tiltEase = easeFactor(0.05, dt);
+      tiltX += (targetTiltX - tiltX) * tiltEase;
+      tiltY += (targetTiltY - tiltY) * tiltEase;
       // The anchor is no longer rotated. It used to carry a slow idle drift
       // plus the mouse tilt, which was harmless when every object sat within
       // 8 units of it - at 8000 units out, a tenth of a radian would sling
       // the far waypoints hundreds of units across the sky. Tilt now moves
       // the camera instead (see computeCameraTarget).
 
+      const dimEase = easeFactor(0.08, dt);
       ALL_KEYS.forEach((key) => {
         let target: number;
         let blurTarget: number;
@@ -2602,8 +2614,8 @@
           target = focusKey === null ? 1 : key === focusKey ? 1 : DIM_FLOOR;
           blurTarget = focusKey === null ? 0 : key === focusKey ? 0 : 1;
         }
-        dimCurrent[key] += (target - dimCurrent[key]) * 0.08;
-        blurCurrent[key] += (blurTarget - blurCurrent[key]) * 0.08;
+        dimCurrent[key] += (target - dimCurrent[key]) * dimEase;
+        blurCurrent[key] += (blurTarget - blurCurrent[key]) * dimEase;
         // Note: no scale normalization here any more. Apparent size is now
         // purely a function of true size and distance, which is the entire
         // point - it's what lets a galaxy read as a galaxy and a probe as a
@@ -2652,15 +2664,15 @@
       // never reached, so no object was ever actually framed. The journey
       // gets a tighter lerp; the dwell curve above is what keeps it from
       // feeling snappy, since during a hold the target isn't moving at all.
-      cameraRig.update(warpKey ? WARP_EASE : inJourney ? JOURNEY_EASE : undefined);
+      cameraRig.update(warpKey ? WARP_EASE : inJourney ? JOURNEY_EASE : undefined, dt);
 
       // Stars are the one thing that should never fall behind: the camera
       // travels ~7800 units, far outside the fixed shells they're built on,
       // so the whole field rides along and surrounds the viewer throughout.
       starfield.group.position.copy(camera.position);
-      starfield.update(0.016, tiltX, tiltY);
+      starfield.update(dt, tiltX, tiltY);
       if (transitDust) {
-        transitDust.update(camera.position.z - prevCameraZ, standoff, camera.position);
+        transitDust.update(camera.position.z - prevCameraZ, standoff, camera.position, dt);
       }
       prevCameraZ = camera.position.z;
 
@@ -2673,12 +2685,14 @@
       about.starMat.color.setScalar(0.45 + 0.55 * dimCurrent.about);
 
       // Eleven bodies on real orbital elements, so this one owns its own
-      // step rather than having its internals poked from out here. Fixed
-      // 0.016 to match `clock` above - the whole scene assumes a fixed step.
-      objects.projects!.userData.update(0.016, dimCurrent.projects);
+      // step rather than having its internals poked from out here. It was
+      // already integrating whatever step it was handed in seconds, so the
+      // real delta is all it needed.
+      objects.projects!.userData.update(dt, dimCurrent.projects);
 
       const music = objects.music!.userData;
-      music.beamGroup.rotation.y += 0.02;
+      // 0.02/frame at 60Hz.
+      music.beamGroup.rotation.y += 1.2 * dt;
       // Sharp, spiky pulse rather than a smooth sine, so it reads as a
       // rhythmic "beat" rather than a slow breathing glow.
       const beat = Math.max(0, Math.sin(clock * 2.4));
@@ -2695,7 +2709,7 @@
       // Slow and mostly about one axis: a real probe is attitude-stabilised
       // with its dish held on Earth, so a lazy drift reads right where a
       // free tumble would look like debris.
-      contact.body.rotation.y += 0.0035;
+      contact.body.rotation.y += 0.21 * dt; // 0.0035/frame at 60Hz
       contact.body.rotation.x = Math.sin(clock * 0.25) * 0.12;
       contact.pings.forEach((ring: THREE.Mesh, i: number) => {
         const phase = ((clock + (i * contact.pingPeriod) / contact.pings.length) % contact.pingPeriod) / contact.pingPeriod;
@@ -2719,7 +2733,7 @@
       // A quarter of the old rate. The previous 0.0006/frame was a full
       // revolution every three minutes, fast enough to read as a spinning
       // pinwheel; this is slow enough to be felt rather than watched.
-      photography.points.rotation.z += 0.00015;
+      photography.points.rotation.z += 0.009 * dt; // 0.00015/frame at 60Hz
       photography.points.material.opacity = 0.85 * dimCurrent.photography;
       photography.haze.material.opacity = 0.09 * dimCurrent.photography;
       photography.coreGlow.material.opacity = 0.42 * dimCurrent.photography;
