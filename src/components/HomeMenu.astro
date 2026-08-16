@@ -535,9 +535,14 @@ const menuItems = [
           if (!reduceMotion) {
             var focus = function () {
               document.dispatchEvent(new CustomEvent("cosmos:focus", { detail: { key: key } }));
+              // Focus reframes; hover flares. Both, here - the fallback menu
+              // is the whole navigation on the tiers that get it, so there
+              // is no reason to hold half the response back.
+              document.dispatchEvent(new CustomEvent("cosmos:hover", { detail: { key: key } }));
             };
             var blur = function () {
               document.dispatchEvent(new CustomEvent("cosmos:blur"));
+              document.dispatchEvent(new CustomEvent("cosmos:hover", { detail: { key: null } }));
             };
             item.addEventListener("mouseenter", focus);
             item.addEventListener("mouseleave", blur);
@@ -713,6 +718,24 @@ const menuItems = [
         // and less stateful than rebinding a single handler every time the
         // active row changes.
         labels.forEach(function (el) {
+          // Hovering a label flares the object it leads to, so the reel and
+          // the scene read as one thing rather than as a list next to a
+          // picture. Bound to all six for the same reason the click handler
+          // below is, though only the row on the line can be pointed at.
+          if (!reduceMotion) {
+            var hoverKey = el.getAttribute("data-cosmos-key");
+            var enter = function () {
+              document.dispatchEvent(new CustomEvent("cosmos:hover", { detail: { key: hoverKey } }));
+            };
+            var leave = function () {
+              document.dispatchEvent(new CustomEvent("cosmos:hover", { detail: { key: null } }));
+            };
+            el.addEventListener("mouseenter", enter);
+            el.addEventListener("mouseleave", leave);
+            el.addEventListener("focus", enter);
+            el.addEventListener("blur", leave);
+          }
+
           el.addEventListener("click", function (ev) {
             if (reduceMotion) return;
             if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;

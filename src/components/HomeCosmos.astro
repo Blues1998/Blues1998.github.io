@@ -2026,6 +2026,26 @@
     // halves of one effect, and a waypoint that dimmed before it softened
     // (or after) reads as two separate things happening.
     const blurCurrent: Record<CosmosKey, number> = { about: 0, projects: 0, playground: 0, music: 0, photography: 0, contact: 0 };
+    // Hover-to-flare: pointing at a label in the menu brightens and sharpens
+    // the object that label leads to, before you commit to going there.
+    //
+    // Deliberately separate from focusKey, which the fallback menu already
+    // drives. focusKey *replaces* the dim/blur targets, which is right for
+    // an inner page (nothing else is happening) and wrong on the homepage,
+    // where the scroll journey owns those targets and a hover would be
+    // fighting it. This rides on top of whatever the journey has decided
+    // instead, so the two compose.
+    let hoverKey: CosmosKey | null = null;
+    const hoverCurrent: Record<CosmosKey, number> = { about: 0, projects: 0, playground: 0, music: 0, photography: 0, contact: 0 };
+    // Above 1: the point is to overdrive an object that is already at full
+    // brightness, since the one being hovered is often the focused one.
+    const HOVER_GAIN = 0.55;
+    const HOVER_LEAN = 0.06;
+    // The eased state behind dimCurrent/blurCurrent. Those two are what the
+    // rest of the scene reads; these are what the lerp accumulates on, kept
+    // apart so the hover lift can be applied on top without compounding.
+    const dimBase: Record<CosmosKey, number> = { about: 1, projects: 1, playground: 1, music: 1, photography: 1, contact: 1 };
+    const blurBase: Record<CosmosKey, number> = { about: 0, projects: 0, playground: 0, music: 0, photography: 0, contact: 0 };
     // Declared up here with the state they belong to rather than beside
     // renderFrame() below: applyRouteFraming() renders a frame of its own
     // and can run from a page-load event that lands while this module is
@@ -2273,6 +2293,14 @@
       document.addEventListener("cosmos:blur", () => {
         focusKey = null;
       });
+
+      // Distinct from focus above: this rides on top of whatever the scroll
+      // journey has already decided, rather than replacing it, so it works
+      // on the homepage where focus does not.
+      document.addEventListener("cosmos:hover", ((e: CustomEvent<{ key: CosmosKey | null }>) => {
+        const key = e.detail.key;
+        hoverKey = key !== null && objects[key] ? key : null;
+      }) as EventListener);
     }
 
     // ---- Route-based arrival framing: which object (if any) a given page
@@ -2411,8 +2439,11 @@
       // shot and render exactly one frame, same policy as the idle scene.
       if (instant) {
         ALL_KEYS.forEach((key) => {
-          dimCurrent[key] = focusKey === null ? 1 : key === focusKey ? 1 : DIM_FLOOR;
-          blurCurrent[key] = focusKey === null ? 0 : key === focusKey ? 0 : 1;
+          dimBase[key] = focusKey === null ? 1 : key === focusKey ? 1 : DIM_FLOOR;
+          blurBase[key] = focusKey === null ? 0 : key === focusKey ? 0 : 1;
+          hoverCurrent[key] = 0;
+          dimCurrent[key] = dimBase[key];
+          blurCurrent[key] = blurBase[key];
         });
       }
       cameraRig.setTarget(framedTarget, standoff);
@@ -2785,6 +2816,10 @@
       // the camera instead (see computeCameraTarget).
 
       const dimEase = easeFactor(0.08, dt);
+      // Shorter than the dim/blur lag on purpose. A hover is a direct answer
+      // to something the visitor just did; at 0.08 it arrived late enough to
+      // read as the scene noticing rather than as the scene responding.
+      const hoverEase = easeFactor(0.16, dt);
       ALL_KEYS.forEach((key) => {
         let target: number;
         let blurTarget: number;
@@ -2796,8 +2831,33 @@
           target = focusKey === null ? 1 : key === focusKey ? 1 : DIM_FLOOR;
           blurTarget = focusKey === null ? 0 : key === focusKey ? 0 : 1;
         }
-        dimCurrent[key] += (target - dimCurrent[key]) * dimEase;
-        blurCurrent[key] += (blurTarget - blurCurrent[key]) * dimEase;
+        const hovered = objects[key]!;
+        hoverCurrent[key] += ((hoverKey === key ? 1 : 0) - hoverCurrent[key]) * hoverEase;
+        dimBase[key] += (target - dimBase[key]) * dimEase;
+        blurBase[key] += (blurTarget - blurBase[key]) * dimEase;
+        // The hover rides on the eased values rather than being folded into
+        // them: an exponential lerp accumulates on its own previous output,
+        // so multiplying the state itself would feed the lift back into the
+        // next frame's starting point and compound it.
+        dimCurrent[key] = dimBase[key] * (1 + HOVER_GAIN * hoverCurrent[key]);
+        // Sharpening as well as brightening, so a hovered waypoint reads
+        // as the thing you are about to travel to rather than as the same
+        // smudge with the contrast turned up.
+        blurCurrent[key] = blurBase[key] * (1 - hoverCurrent[key]);
+        // And a lean toward the viewer, which is the part that actually
+        // registers. Brightness alone was close to invisible here: the
+        // label you can point at is by construction the waypoint you are
+        // already parked on, so it is already at full brightness and zero
+        // blur, and every opacity the lift feeds clamps at 1. Measured
+        // total frame luminance did not move. Scale has no such ceiling.
+        //
+        // Safe against the framing maths: group scale is set once at
+        // construction and placeObjects() only ever touches position, and
+        // six percent is well inside the padding the defocus scissor
+        // already carries.
+        if (hoverCurrent[key] > 0.001 || hovered.scale.x !== OBJECT_LAYOUT[key].scale) {
+          hovered.scale.setScalar(OBJECT_LAYOUT[key].scale * (1 + HOVER_LEAN * hoverCurrent[key]));
+        }
         // Note: no scale normalization here any more. Apparent size is now
         // purely a function of true size and distance, which is the entire
         // point - it's what lets a galaxy read as a galaxy and a probe as a
