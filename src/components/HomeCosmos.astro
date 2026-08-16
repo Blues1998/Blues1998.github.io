@@ -105,6 +105,7 @@
   import { createCameraRig } from "../lib/cosmos/cameraRig";
   import { createTransitDust, type TransitDust } from "../lib/cosmos/transitDust";
   import { createSkyEvents } from "../lib/cosmos/skyEvents";
+  import { applyGalaxyShear, applyNebulaDrift, createMotionClock } from "../lib/cosmos/pointMotion";
   import { MAX_STEP, easeFactor } from "../lib/cosmos/timing";
 
   const LOG = "[HomeCosmos]";
@@ -280,6 +281,18 @@
     const skyEvents = createSkyEvents(accentColor, reduceMotion);
     scene.add(skyEvents.object);
 
+    // Shared by the galaxy's shear and the nebula's drift (pointMotion.ts):
+    // both are vertex-shader effects driven by elapsed seconds, and one
+    // uniform object handed to both materials means one number to advance
+    // per frame instead of a uniform update per material.
+    const motionClock = createMotionClock();
+    // Radians per second at the disc's centre, falling off with radius.
+    // A full turn of the core takes about six minutes.
+    const GALAXY_SHEAR = 0.006;
+    // Local units. The cloud is a few units across, so this is a drift of
+    // well under a percent - gas moving, not the nebula wobbling.
+    const NEBULA_DRIFT = 0.012;
+
     // Created only alongside the six-object scene: it exists to sell travel
     // between waypoints, and mobile has neither the objects nor the journey.
     let transitDust: TransitDust | null = null;
@@ -451,7 +464,37 @@
       const coronaOuter = makeGlowSprite(2.8, 0.28);
       group.add(coronaInner, coronaOuter);
 
-      group.userData = { starMat, star, coronaInner, coronaOuter };
+      // A mass ejection, every minute or two.
+      //
+      // The star was the object with the least happening on it: a texture,
+      // a slow scale pulse and two breathing coronae, all of which are
+      // loops. This is the one thing it does that has a beginning.
+      //
+      // Built as a short line of sprites rather than one stretched sprite
+      // because a sprite cannot be stretched along a direction in the
+      // world - it is billboarded, and its only rotation control is in
+      // screen space. Four overlapping puffs of falling size, oriented as
+      // a group, read as a plume from any angle the camera can reach.
+      const flare = new THREE.Group();
+      flare.visible = false;
+      group.add(flare);
+      const FLARE_PUFFS = 4;
+      const flarePuffs: THREE.Sprite[] = [];
+      const flareHot = new THREE.Color(0xffe6b8);
+      const flareCool = new THREE.Color(0xff7a2e);
+      for (let i = 0; i < FLARE_PUFFS; i++) {
+        const t = i / (FLARE_PUFFS - 1);
+        // Sized and spaced against the coronae, not against the star. The
+        // inner corona is a 1.6-unit glow sprite over a 0.5-unit star, so
+        // anything that stays close to the surface is simply swallowed by
+        // it - the first version was invisible for exactly that reason.
+        const puff = makeGlowSprite(0.6 * (1 - t * 0.4), 0, flareHot.clone().lerp(flareCool, t), null);
+        puff.position.y = t * 0.85;
+        flare.add(puff);
+        flarePuffs.push(puff);
+      }
+
+      group.userData = { starMat, star, coronaInner, coronaOuter, flare, flarePuffs };
       objects.about = group;
     }
 
@@ -1438,6 +1481,7 @@
       });
       const points = new THREE.Points(geo, mat);
       group.add(points);
+      applyNebulaDrift(mat, motionClock, NEBULA_DRIFT);
 
       const repaintPuffs = () => {
         nebulaSpriteMats.forEach((m) => {
@@ -1589,6 +1633,11 @@
       });
       const haze = new THREE.Points(hazeGeo, hazeMat);
       group.add(haze);
+
+      // Stars and haze are the same disc sampled twice, so they have to
+      // shear as one thing or the galaxy separates into two galaxies.
+      applyGalaxyShear(mat, motionClock, GALAXY_SHEAR);
+      applyGalaxyShear(hazeMat, motionClock, GALAXY_SHEAR);
 
       // Painted only now: the ramp fills the star buffer and the haze
       // buffer in one pass, so it has to run after both exist.
@@ -2590,6 +2639,128 @@
       renderer.autoClear = true;
     }
 
+    // ---- The star's mass ejections ----
+    const FLARE_GAP: [number, number] = [45, 95];
+    const FLARE_LIFE = 5.5;
+    const FLARE_UP = new THREE.Vector3(0, 1, 0);
+    const flareDir = new THREE.Vector3();
+    const flareCenter = new THREE.Vector3();
+    const flareView = new THREE.Vector3();
+    let flareWait = 12 + Math.random() * 20;
+    let flareT = -1;
+
+    function updateFlare(dt: number, dim: number) {
+      const about = objects.about;
+      if (!about) return;
+      const flare = about.userData.flare as THREE.Group;
+      const puffs = about.userData.flarePuffs as THREE.Sprite[];
+
+      if (flareT < 0) {
+        flareWait -= dt;
+        if (flareWait > 0) return;
+        flareT = 0;
+        // A fresh direction each time - real ejections come off active
+        // regions, and since the star rotates here, that is closer to the
+        // truth than any fixed set of launch sites.
+        //
+        // Then flattened toward the plane of the sky. A direction sampled
+        // freely on the sphere points at or away from the camera as often
+        // as not, and a plume projected onto a disc that already fills a
+        // third of the frame is a smudge on a bright surface - which is
+        // what the first version looked like. Seen from the side it clears
+        // the limb against dark sky, which is also how every photograph of
+        // one is taken.
+        flareDir.set(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize();
+        about.getWorldPosition(flareCenter);
+        flareView.copy(camera.position).sub(flareCenter).normalize();
+        flareDir.addScaledVector(flareView, -flareDir.dot(flareView) * 0.85).normalize();
+        flare.quaternion.setFromUnitVectors(FLARE_UP, flareDir);
+        flare.visible = true;
+      }
+
+      flareT += dt;
+      if (flareT >= FLARE_LIFE) {
+        flareT = -1;
+        flareWait = FLARE_GAP[0] + Math.random() * (FLARE_GAP[1] - FLARE_GAP[0]);
+        flare.visible = false;
+        return;
+      }
+
+      const p = flareT / FLARE_LIFE;
+      // Leaves the limb fast and decelerates, rather than travelling at a
+      // constant rate - which is both what the material does against the
+      // star's gravity and what keeps the launch readable.
+      const reach = 0.5 + Math.pow(p, 0.55) * 1.9;
+      flare.position.copy(flareDir).multiplyScalar(reach);
+      flare.scale.setScalar(1 + p * 1.6);
+      // Fades in over the first tenth and spends the rest dying, so it
+      // erupts rather than materializing.
+      const envelope = Math.min(1, p * 10) * Math.pow(1 - p, 1.5);
+      puffs.forEach((puff, i) => {
+        const trail = 1 - (i / puffs.length) * 0.55;
+        (puff.material as THREE.SpriteMaterial).opacity = envelope * trail * dim;
+      });
+    }
+
+    // ---- The pulsar's flash, aimed ----
+    //
+    // The beat used to be Math.sin(clock * 2.4), which had nothing to do
+    // with where the beams were pointing: the object flashed on its own
+    // schedule while two cones swept past on theirs, and the one thing that
+    // makes a pulsar a pulsar - that you see it *because* a beam crossed
+    // you - was missing. This derives the flash from the real geometry
+    // instead. It is the same event now.
+    const BEAM_RATE = 1.2; // rad/s about the object's axis
+    const beamAxis = new THREE.Vector3();
+    const toCamera = new THREE.Vector3();
+    const beamCenter = new THREE.Vector3();
+    let beamPhase = 0;
+    let aimWindowMax = 0;
+    let aimWindowMin = 1;
+    let aimMax = 1;
+    let aimMin = 0;
+
+    function beamFlash(dt: number): number {
+      const group = objects.music;
+      if (!group) return 0;
+      const beamGroup = group.userData.beamGroup as THREE.Object3D;
+      beamGroup.updateWorldMatrix(true, false);
+      // The cones are built along the group's local x, so this is the beam
+      // axis; the two of them are opposite, which is why the sign is
+      // dropped rather than clamped.
+      beamAxis.set(1, 0, 0).transformDirection(beamGroup.matrixWorld);
+      group.getWorldPosition(beamCenter);
+      toCamera.copy(camera.position).sub(beamCenter).normalize();
+      const aim = Math.abs(beamAxis.dot(toCamera));
+
+      // How close the beam comes to the viewer depends entirely on where
+      // the viewer is: from most angles the sweep never points anywhere
+      // near you, and a raw dot product would leave the pulsar permanently
+      // dark. So the flash is normalized against the range this sweep
+      // actually covers, sampled over the previous half-turn - two beams,
+      // so half a turn is one full cycle of the geometry.
+      aimWindowMax = Math.max(aimWindowMax, aim);
+      aimWindowMin = Math.min(aimWindowMin, aim);
+      beamPhase += BEAM_RATE * dt;
+      if (beamPhase >= Math.PI) {
+        beamPhase -= Math.PI;
+        aimMax = aimWindowMax;
+        aimMin = aimWindowMin;
+        aimWindowMax = 0;
+        aimWindowMin = 1;
+      }
+
+      const span = aimMax - aimMin;
+      // A viewer sitting on the rotation axis sees no variation at all, and
+      // dividing by that span would turn sampling noise into a strobe.
+      // Hold a steady half-lit state instead, which is also the honest
+      // answer: nothing is sweeping past you.
+      const t = span > 0.02 ? THREE.MathUtils.clamp((aim - aimMin) / span, 0, 1) : 0.5;
+      // Steep, so the beam has to be close to pointed at you before
+      // anything happens - a sharp beat rather than a breathing glow.
+      return Math.pow(t, 12);
+    }
+
     function animate(now: number) {
       // Real elapsed time, clamped (see timing.ts). Everything below that
       // used to be a per-frame constant is expressed against this, so the
@@ -2683,6 +2854,7 @@
       starfield.group.position.copy(camera.position);
       starfield.update(dt, tiltX, tiltY);
       skyEvents.update(dt, standoff, camera.position);
+      motionClock.advance(dt);
       if (transitDust) {
         transitDust.update(camera.position.z - prevCameraZ, standoff, camera.position, dt);
       }
@@ -2695,6 +2867,7 @@
       about.coronaInner.material.opacity = (0.5 + Math.sin(clock * 0.9) * 0.1) * dimCurrent.about;
       about.coronaOuter.material.opacity = (0.24 + Math.sin(clock * 0.6 + 1) * 0.06) * dimCurrent.about;
       about.starMat.color.setScalar(0.45 + 0.55 * dimCurrent.about);
+      updateFlare(dt, dimCurrent.about);
 
       // Eleven bodies on real orbital elements, so this one owns its own
       // step rather than having its internals poked from out here. It was
@@ -2704,11 +2877,8 @@
 
       const music = objects.music!.userData;
       // 0.02/frame at 60Hz.
-      music.beamGroup.rotation.y += 1.2 * dt;
-      // Sharp, spiky pulse rather than a smooth sine, so it reads as a
-      // rhythmic "beat" rather than a slow breathing glow.
-      const beat = Math.max(0, Math.sin(clock * 2.4));
-      const flash = Math.pow(beat, 10);
+      music.beamGroup.rotation.y += BEAM_RATE * dt;
+      const flash = beamFlash(dt);
       music.coreGlow.material.opacity = (0.5 + flash * 0.5) * dimCurrent.music;
       music.haloGlow.material.opacity = (0.22 + flash * 0.25) * dimCurrent.music;
       music.coreMat.emissiveIntensity = (1.2 + flash * 1.8) * dimCurrent.music;
@@ -2742,10 +2912,13 @@
       playground.points.material.opacity = 0.9 * dimCurrent.playground;
 
       const photography = objects.photography!.userData;
-      // A quarter of the old rate. The previous 0.0006/frame was a full
-      // revolution every three minutes, fast enough to read as a spinning
-      // pinwheel; this is slow enough to be felt rather than watched.
-      photography.points.rotation.z += 0.009 * dt; // 0.00015/frame at 60Hz
+      // No rotation here any more. This used to turn the star cloud about
+      // its z - which, since the disc is built in the xz plane, tipped the
+      // galaxy end over end rather than spinning it. It now shears about
+      // the disc's real axis, in the vertex shader, at a rate that falls
+      // off with radius (see pointMotion.ts): the inner disc laps the
+      // outer one and the arms trail, which is what a galaxy does and what
+      // rigid rotation cannot look like at any speed.
       photography.points.material.opacity = 0.85 * dimCurrent.photography;
       photography.haze.material.opacity = 0.09 * dimCurrent.photography;
       photography.coreGlow.material.opacity = 0.42 * dimCurrent.photography;
