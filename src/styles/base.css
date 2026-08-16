@@ -157,6 +157,35 @@ body > footer {
   transform: translateY(10px);
 }
 
+/* ---------- Content arrival ----------
+   The page transit above moves <main> as one block. This is the level
+   below it: the content inside assembles - heading, then paragraph, then
+   list - so an inner page is something that lands rather than something
+   that is simply already there. Logic and timing live in lib/arrive.ts.
+
+   Both gates have to be present for anything to hide. [data-arrive] on
+   <main> is server-rendered and says the page opted in; the one on <html>
+   is set by an inline head script and says JavaScript is running and
+   motion is welcome. A visitor with neither gets the page exactly as it
+   was before any of this existed. */
+html[data-arrive] main[data-arrive] > :not(section),
+html[data-arrive] main[data-arrive] > section > * {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 560ms ease,
+    transform 560ms cubic-bezier(0.22, 0.7, 0.24, 1);
+  /* The rise is the only transform these elements carry, so promoting them
+     for the length of it avoids re-rasterizing text on every frame. */
+  will-change: opacity, transform;
+}
+
+html[data-arrive] main[data-arrive] [data-arrived] {
+  opacity: 1;
+  transform: none;
+  will-change: auto;
+}
+
 /* The cosmos canvas is persisted and rendering live right through the
    route swap, so there is nothing for the View Transitions API to usefully
    cross-fade there - it just paints a frozen snapshot of the previous

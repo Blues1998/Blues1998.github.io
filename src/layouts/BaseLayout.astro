@@ -17,6 +17,14 @@ const {
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const socialImage = new URL("/images/og-default.png", Astro.site);
+
+// Which pages let their content assemble on arrival (see lib/arrive.ts).
+// The homepage is excluded on purpose: its <main> is a 600vh scroll track
+// driving the camera, with position:fixed menu chrome inside it, and it
+// already has choreography of its own in IntroSequence and HomeMenu.
+// hideChrome pages (the playground experiments, the terminal) run their
+// own full-screen apps and have no prose to stagger.
+const arrives = !hideChrome && Astro.url.pathname.replace(/\/+$/, "") !== "";
 ---
 
 <!DOCTYPE html>
@@ -36,6 +44,28 @@ const socialImage = new URL("/images/og-default.png", Astro.site);
          normal full page load. -->
     <meta name="astro-view-transitions-fallback" content="swap" />
     <ClientRouter />
+
+    <!-- Arms the content-arrival animation (see lib/arrive.ts). Inline and
+         in <head> so the hidden state is in force before the first paint;
+         doing it from the module below would show the finished page for a
+         frame and then blank it. Absent this attribute the CSS leaves
+         everything visible, which is what a no-JS or reduced-motion
+         visitor gets. -->
+    <script is:inline>
+      (function () {
+        var root = document.documentElement;
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        root.setAttribute("data-arrive", "");
+        // Failsafe. The attribute above is what hides the content, and the
+        // module that reveals it again could fail to arrive at all - a
+        // bundle that 404s, an error thrown before it binds. Without this
+        // that leaves every inner page permanently blank, which is a far
+        // worse outcome than an unanimated one.
+        setTimeout(function () {
+          if (!window.__arriveReady) root.removeAttribute("data-arrive");
+        }, 2500);
+      })();
+    </script>
 
     <title>{title}</title>
     <meta name="description" content={description} />
@@ -80,11 +110,28 @@ const socialImage = new URL("/images/og-default.png", Astro.site);
 
     {!hideChrome && <Header />}
 
-    <main id="main" class={hideChrome ? "main-bare" : undefined}>
+    <main
+      id="main"
+      class={hideChrome ? "main-bare" : undefined}
+      data-arrive={arrives ? "" : undefined}
+    >
       <slot />
     </main>
 
     {!hideChrome && <Footer />}
+
+    <script>
+      import { armArrival, runArrival } from "../lib/arrive";
+      window.__arriveReady = true;
+      // Bound once against the never-swapped document, for the same reason
+      // the terminal shortcut below is: this script re-executes on every
+      // client-side navigation, and an unguarded listener would stack.
+      if (!window.__arriveBound) {
+        window.__arriveBound = true;
+        document.addEventListener("astro:after-swap", armArrival);
+        document.addEventListener("astro:page-load", runArrival);
+      }
+    </script>
 
     <!-- Hidden terminal trigger. Guarded: with <ClientRouter /> active,
          this inline script re-executes on every client-side navigation
