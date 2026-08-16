@@ -104,6 +104,7 @@
   import { createStarfield } from "../lib/cosmos/starfield";
   import { createCameraRig } from "../lib/cosmos/cameraRig";
   import { createTransitDust, type TransitDust } from "../lib/cosmos/transitDust";
+  import { createSkyEvents } from "../lib/cosmos/skyEvents";
   import { MAX_STEP, easeFactor } from "../lib/cosmos/timing";
 
   const LOG = "[HomeCosmos]";
@@ -270,6 +271,14 @@
     // the anchor shifts for the six-object layout.
     const starfield = createStarfield(starfieldProfile, accentColor, reduceMotion);
     scene.add(starfield.group);
+
+    // Meteors and the occasional supernova. On the sky rather than on any
+    // waypoint, so they play on every page - and on every tier, unlike the
+    // six-object scene: a phone gets the starfield and nothing else, which
+    // makes it the tier with the most to gain from something happening in
+    // it. The cost is one draw call and a sprite.
+    const skyEvents = createSkyEvents(accentColor, reduceMotion);
+    scene.add(skyEvents.object);
 
     // Created only alongside the six-object scene: it exists to sell travel
     // between waypoints, and mobile has neither the objects nor the journey.
@@ -2518,6 +2527,7 @@
 
       // Pass two: one softened object at a time, back to front.
       starfield.group.visible = false;
+      skyEvents.object.visible = false;
       const dust = transitDust ? transitDust.object : null;
       if (dust) dust.visible = false;
 
@@ -2574,6 +2584,7 @@
         objects[key]!.visible = defocusWasVisible[i];
       });
       starfield.group.visible = true;
+      skyEvents.object.visible = true;
       if (dust) dust.visible = true;
       renderer.setRenderTarget(null);
       renderer.autoClear = true;
@@ -2671,6 +2682,7 @@
       // so the whole field rides along and surrounds the viewer throughout.
       starfield.group.position.copy(camera.position);
       starfield.update(dt, tiltX, tiltY);
+      skyEvents.update(dt, standoff, camera.position);
       if (transitDust) {
         transitDust.update(camera.position.z - prevCameraZ, standoff, camera.position, dt);
       }
