@@ -157,6 +157,26 @@ body > footer {
   transform: translateY(10px);
 }
 
+/* ---------- Drag to look ----------
+   The homepage's <main> is a scroll track with nothing in it but the menu,
+   and the scene behind it is the content - so the whole surface is
+   grabbable there (HomeCosmos.astro's pointer handlers scope the gesture
+   to hero mode for the same reason). Links keep their own cursor; a drag
+   started on one is ignored anyway. Inner pages are untouched: dragging
+   across prose means selecting it. */
+#home-cosmos[data-cosmos-mode="hero"] ~ main {
+  cursor: grab;
+}
+
+#home-cosmos[data-cosmos-drag] ~ main {
+  cursor: grabbing;
+}
+
+#home-cosmos[data-cosmos-mode="hero"] ~ main a,
+#home-cosmos[data-cosmos-mode="hero"] ~ main button {
+  cursor: pointer;
+}
+
 /* ---------- Content arrival ----------
    The page transit above moves <main> as one block. This is the level
    below it: the content inside assembles - heading, then paragraph, then

@@ -2007,6 +2007,16 @@
     let tiltY = 0;
     let targetTiltX = 0;
     let targetTiltY = 0;
+    // Drag-to-look, held apart from the ambient tilt above: that one tracks
+    // the pointer's absolute position and is always live, this one
+    // accumulates while a drag is held and springs back to nothing after.
+    // They add.
+    let dragging = false;
+    let dragPointer = -1;
+    let dragLastX = 0;
+    let dragLastY = 0;
+    let dragTiltX = 0;
+    let dragTiltY = 0;
     let clock = 0;
     // rAF's own timestamp, so the first frame after a tab regains focus is
     // measured from the frame that actually preceded it.
@@ -2272,8 +2282,8 @@
       // angle for the object being visited and almost nothing for one a
       // thousand units further out.
       out.set(
-        objectWorldPos.x - framingOffsetX(standoff) + tiltY * standoff * 0.35,
-        objectWorldPos.y - tiltX * standoff * 0.35,
+        objectWorldPos.x - framingOffsetX(standoff) + (tiltY + dragTiltY) * standoff * 0.35,
+        objectWorldPos.y - (tiltX + dragTiltX) * standoff * 0.35,
         objectWorldPos.z,
       );
       return standoff;
@@ -2281,10 +2291,76 @@
 
     if (!reduceMotion) {
       window.addEventListener("mousemove", (e) => {
+        // Suppressed mid-drag. The pointer is being used to say something
+        // specific at that moment, and letting the ambient sway keep
+        // tracking it as well makes the same motion count twice.
+        if (dragging) return;
         const nx = e.clientX / window.innerWidth - 0.5;
         const ny = e.clientY / window.innerHeight - 0.5;
         targetTiltY = nx * 0.12;
         targetTiltX = ny * 0.08;
+      });
+
+      // ---- Drag to look around ----
+      //
+      // The scene had exactly one thing you could do to it - scroll - and
+      // scrolling is the site's navigation, so the objects themselves were
+      // never anything you could touch. Dragging swings the camera around
+      // whatever it is framing and springs back when you let go, which is
+      // enough to make them read as things in a space rather than as
+      // pictures of things.
+      //
+      // It reuses the tilt channel above rather than adding a second
+      // camera concept: tilt already pans the whole rig by an amount
+      // proportional to the standoff, which is what makes it real parallax
+      // instead of a swivel, and a drag is the same gesture with a wider
+      // range and a memory.
+      //
+      // Homepage only. There, <main> is a scroll track with a menu in it
+      // and the objects are the content. On an inner page the scene is a
+      // backdrop behind prose, and a drag across prose means selecting
+      // text - taking that over would be a straight loss.
+      const DRAG_SENSITIVITY = 0.0011;
+      const DRAG_LIMIT = 0.3;
+      window.addEventListener("pointerdown", (e) => {
+        if (cosmosMode !== "hero" || dragging) return;
+        // Touch and pen are left alone: on a touch screen this same gesture
+        // is the scroll that drives the entire journey.
+        if (e.pointerType !== "mouse" || e.button !== 0) return;
+        const target = e.target as HTMLElement | null;
+        if (target?.closest("a, button, input, textarea, select, [role='button']")) return;
+        dragging = true;
+        dragPointer = e.pointerId;
+        dragLastX = e.clientX;
+        dragLastY = e.clientY;
+        container!.dataset.cosmosDrag = "true";
+      });
+
+      const endDrag = (e: PointerEvent) => {
+        if (!dragging || e.pointerId !== dragPointer) return;
+        dragging = false;
+        delete container!.dataset.cosmosDrag;
+      };
+      window.addEventListener("pointerup", endDrag);
+      window.addEventListener("pointercancel", endDrag);
+
+      window.addEventListener("pointermove", (e) => {
+        if (!dragging || e.pointerId !== dragPointer) return;
+        // Both signs negative, so the scene follows the pointer: the camera
+        // moves opposite to what it frames, and a drag that pushed the
+        // object the other way would feel like fighting it.
+        dragTiltY = THREE.MathUtils.clamp(
+          dragTiltY - (e.clientX - dragLastX) * DRAG_SENSITIVITY,
+          -DRAG_LIMIT,
+          DRAG_LIMIT,
+        );
+        dragTiltX = THREE.MathUtils.clamp(
+          dragTiltX + (e.clientY - dragLastY) * DRAG_SENSITIVITY,
+          -DRAG_LIMIT,
+          DRAG_LIMIT,
+        );
+        dragLastX = e.clientX;
+        dragLastY = e.clientY;
       });
 
       document.addEventListener("cosmos:focus", ((e: CustomEvent<{ key: CosmosKey }>) => {
@@ -2809,6 +2885,14 @@
       const tiltEase = easeFactor(0.05, dt);
       tiltX += (targetTiltX - tiltX) * tiltEase;
       tiltY += (targetTiltY - tiltY) * tiltEase;
+      // Spring-back. Slower than the ambient tilt, so releasing a drag
+      // reads as the camera settling rather than snapping home - and it is
+      // only applied once the drag is over, so what is held stays held.
+      if (!dragging) {
+        const release = easeFactor(0.035, dt);
+        dragTiltX += (0 - dragTiltX) * release;
+        dragTiltY += (0 - dragTiltY) * release;
+      }
       // The anchor is no longer rotated. It used to carry a slow idle drift
       // plus the mouse tilt, which was harmless when every object sat within
       // 8 units of it - at 8000 units out, a tenth of a radian would sling
