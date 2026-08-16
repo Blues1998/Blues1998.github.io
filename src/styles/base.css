@@ -19,7 +19,20 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* ---------- Typography ---------- */
+/* ---------- Typography ----------
+   The voice here is the homepage's. HomeMenu already sets its kicker and
+   its journey readout in tracked monospace - "ANIMESH SINGH", "01 / 06",
+   the destination names racking past - and that reads unmistakably as an
+   instrument. None of it used to survive the click: every inner page was
+   plain Inter body copy under a Space Grotesk heading, so travelling to a
+   destination meant arriving in a different website.
+
+   The split below is deliberate. Structure - kickers, section labels, list
+   indices, metadata - is monospace, uppercase and widely tracked, because
+   wide tracking is the clearest possible signal that a run of characters is
+   a label rather than something to read. Prose stays humanist and stays
+   calm, because paragraphs set in tracked monospace are a costume, not a
+   design. */
 h1,
 h2,
 h3,
@@ -32,17 +45,45 @@ h4 {
 
 h1 {
   font-size: var(--font-size-xxl);
+  /* Uppercase and tracked: this is the plate the page is named on, and it
+     is the one piece of the destination that should feel machined. */
+  text-transform: uppercase;
+  letter-spacing: var(--track-title);
   margin-bottom: var(--space-3);
 }
 
 h2 {
-  font-size: var(--font-size-xl);
-  margin-bottom: var(--space-2);
+  font-size: var(--font-size-lg);
+  text-transform: uppercase;
+  letter-spacing: var(--track-label);
+  color: var(--color-text);
+  margin-bottom: var(--space-3);
 }
 
 h3 {
   font-size: var(--font-size-lg);
   margin-bottom: var(--space-2);
+}
+
+/* Section markers, not headlines. A rule running off the right of the label
+   to the edge of the column is what turns an <h2> into a division of the
+   page rather than a smaller <h1> competing with the one above it.
+
+   Scoped to a page section's own heading. README content (rendered from
+   GitHub markdown, inside main > section > article) and anything else
+   nested deeper keeps ordinary heading behaviour - see the explicit reset
+   in components.css. */
+main > section > h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+main > section > h2::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, var(--color-border), transparent);
 }
 
 p {
@@ -55,19 +96,104 @@ small {
   color: var(--color-muted);
 }
 
+/* ---------- Readout voice ----------
+   The kicker that carries the homepage's "01 / 06" indexing onto the
+   destination page, so an inner page announces where in the journey you
+   just landed instead of dropping the thread the moment you arrive. */
+.page-kicker {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin: 0 0 var(--space-3);
+}
+
+.page-kicker .page-kicker-index {
+  color: var(--color-accent);
+}
+
+/* Metadata: durations, counts, tech, credits. Anything the page states
+   about itself rather than says. */
+.readout {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+}
+
+/* ---------- Lists ----------
+   The bullet glyphs used to be typed into the markup - <li>• Bias toward
+   simple systems</li> - which meant a screen reader announced the list
+   semantics and then read the character out on top of them, and no
+   stylesheet could touch the marker. These are counters instead, set in the
+   instrument voice: a numbered readout rather than a bulleted list. */
+.signals {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: signal;
+}
+
+.signals li {
+  counter-increment: signal;
+  position: relative;
+  padding-left: 2.75rem;
+  margin-bottom: var(--space-2);
+  /* Was --color-muted, which put the substance of the About page in the
+     dimmest colour available while its closing aside sat at full strength.
+     A list is content, not metadata. */
+  color: var(--color-text-soft);
+}
+
+.signals li::before {
+  content: counter(signal, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 0.15em;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.08em;
+  color: var(--color-accent);
+  opacity: 0.75;
+}
+
+.signals li strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
 /* ---------- Links ---------- */
 a {
   color: var(--color-accent);
   text-decoration: none;
 }
 
+/* Underline on the link's own baseline offset rather than the browser's, so
+   descenders stay readable, and animated from the hover state rather than
+   appearing all at once. */
 a:hover {
   text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
 }
 
 a:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 3px;
+}
+
+/* Leaving the site is worth marking. Scoped to content links so the nav,
+   the footer and the credits line - which are lists of destinations, where
+   a marker on every row is just noise - stay clean. */
+main a[target="_blank"]::after {
+  content: "↗";
+  display: inline-block;
+  margin-left: 0.25em;
+  font-size: 0.8em;
+  vertical-align: 0.15em;
+  opacity: 0.6;
 }
 
 /* ---------- Layout primitives ---------- */

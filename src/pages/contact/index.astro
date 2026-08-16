@@ -7,6 +7,7 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
   description="Ways to reach me."
 >
   <section>
+    <p class="page-kicker"><span class="page-kicker-index">06</span> / 06</p>
     <h1>Contact</h1>
 
     <p>
@@ -15,15 +16,23 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
     </p>
   </section>
 
+  <!-- A channel list rather than a bulleted list. This page is the site's
+       call to action and had the least design on it: three list items in
+       the dimmest grey available, with the label and the address running
+       together on one line. Each row now leads with its channel in the
+       readout voice and gives the address itself the emphasis. -->
   <section>
-    <ul class="signals">
+    <ul class="channels">
       <li>
-        • Email:
-        <a href="mailto:animesh98388@gmail.com">animesh98388@gmail.com</a>
+        <span class="channel-label">Email</span>
+        <a class="channel-value" href="mailto:animesh98388@gmail.com">
+          animesh98388@gmail.com
+        </a>
       </li>
       <li>
-        • GitHub:
+        <span class="channel-label">GitHub</span>
         <a
+          class="channel-value"
           href="https://github.com/Blues1998"
           target="_blank"
           rel="noopener noreferrer"
@@ -32,8 +41,9 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
         </a>
       </li>
       <li>
-        • LinkedIn:
+        <span class="channel-label">LinkedIn</span>
         <a
+          class="channel-value"
           href="https://www.linkedin.com/in/animesh-singh-profile/"
           target="_blank"
           rel="noopener noreferrer"

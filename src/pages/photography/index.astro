@@ -35,6 +35,7 @@ const photos = await Promise.all(
   description="A curated, immersive selection of photographs."
 >
   <section>
+    <p class="page-kicker"><span class="page-kicker-index">03</span> / 06</p>
     <div class="photo-header">
       <div class="photo-header-left">
         <h1>Photography</h1>
@@ -265,7 +266,12 @@ const photos = await Promise.all(
     justify-content: space-between;
     flex-wrap: wrap;
     gap: var(--space-3);
-    margin-bottom: var(--space-1);
+    /* Matches the margin-bottom every other page's <h1> carries. This
+       wrapper zeroes the h1's own margin (below), so at --space-1 the
+       intro paragraph sat 8px under the title here against 24px
+       everywhere else - the same page furniture at two different rhythms
+       depending on which route you were on. */
+    margin-bottom: var(--space-3);
   }
 
   .photo-header-left {
@@ -280,8 +286,11 @@ const photos = await Promise.all(
 
   .photo-nav {
     display: flex;
-    gap: var(--space-2);
-    font-size: var(--font-size-sm);
+    gap: var(--space-3);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
   }
 
   .photo-nav a {

@@ -9,17 +9,54 @@
   --color-accent: #7c8aff;
   --color-border: rgba(255, 255, 255, 0.08);
 
+  /* One step between --color-text and --color-muted, for prose that is
+     genuinely secondary. It exists because there was nothing here between
+     "full brightness" and "metadata grey", so anything the page wanted to
+     rank below a paragraph fell all the way to --color-muted - which is how
+     the About page ended up with its actual substance (how I work, what I'm
+     exploring) set in the dimmest colour on the site while a throwaway
+     closing line sat at full strength. */
+  --color-text-soft: #b9bcc5;
+
+  /* ---------- Surfaces ----------
+     Every panel on the site used to be filled with --color-bg itself, which
+     is fully opaque - so a project card or a track row punched a solid
+     black rectangle out of the scene behind it and cut the orbit rings off
+     at its own edge. These are translucent: enough fill to read as a
+     surface, not enough to occlude what it's sitting in front of. */
+  --surface: color-mix(in srgb, var(--color-bg) 42%, transparent);
+  --surface-strong: color-mix(in srgb, var(--color-bg) 62%, transparent);
+  --surface-border: rgba(255, 255, 255, 0.1);
+  --surface-blur: 14px;
+
   /* ---------- Typography ---------- */
   --font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-heading: "Space Grotesk", "Inter", system-ui, sans-serif;
+  /* The instrument voice. Deliberately a system stack and not a webfont:
+     the homepage readout (HomeMenu's .home-kicker and .home-journey-*)
+     already draws from exactly this list, so carrying that voice onto the
+     inner pages costs nothing to download. */
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
 
   --font-size-base: 18px;
   --line-height-base: 1.65;
 
-  --font-size-sm: 0.9rem;
-  --font-size-lg: 1.2rem;
-  --font-size-xl: 1.6rem;
-  --font-size-xxl: 2.2rem;
+  /* Fluid from here down. The scale used to be fixed rem, so an <h1> was
+     39.6px in a 390px phone column and the identical 39.6px on a 2560px
+     display - too tight at one end and undersized at the other. */
+  --font-size-xs: 0.74rem;
+  --font-size-sm: 0.86rem;
+  --font-size-lg: clamp(1.1rem, 1.02rem + 0.34vw, 1.28rem);
+  --font-size-xl: clamp(1.3rem, 1.12rem + 0.8vw, 1.72rem);
+  --font-size-xxl: clamp(1.75rem, 1.3rem + 1.9vw, 2.7rem);
+
+  /* Tracking. Wide tracking is the single most legible signal that a run of
+     text is an instrument label rather than something to read, which is the
+     whole basis of the readout voice - keeping the values named means a
+     kicker on an inner page and the homepage's own kicker can't drift. */
+  --track-wide: 0.25em;
+  --track-label: 0.14em;
+  --track-title: 0.06em;
 
   /* ---------- Layout ---------- */
   --max-width: 70ch;
@@ -39,4 +76,12 @@
   /* ---------- Radius ---------- */
   --radius-sm: 4px;
   --radius-md: 6px;
+
+  /* Tells the browser this document is dark, which is what makes the UA
+     render its own widgets to match: native <audio>/<video> transport bars
+     (three of which sat on the Music page as bright white pills, the
+     loudest thing on the entire site), scrollbars, and form controls. The
+     site has been dark-only since the redesign and had never actually said
+     so. */
+  color-scheme: dark;
 }
