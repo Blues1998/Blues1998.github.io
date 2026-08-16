@@ -43,16 +43,40 @@ const MAX_STEPPED = 8;
 // A unit is the thing that arrives: for a <section>, each of its own
 // children (heading, paragraph, list) rather than the section as a whole,
 // which is what makes the content assemble rather than appear in slabs.
+// An element that is not in normal flow is not part of the page reading
+// down the screen, and animating it as though it were is at best wrong and
+// at worst destructive: the Photography lightbox is a fixed, full-screen
+// dialog that happens to be a child of <main>, and treating it as a unit
+// meant the reveal fought its own closed state.
+function inFlow(el: HTMLElement): boolean {
+  const position = getComputedStyle(el).position;
+  return position !== "fixed" && position !== "absolute";
+}
+
 function collectUnits(main: Element): HTMLElement[] {
   const units: HTMLElement[] = [];
+
+  function consider(el: HTMLElement) {
+    if (inFlow(el)) {
+      units.push(el);
+      return;
+    }
+    // Exempt, but *marked* exempt rather than simply left alone. The hidden
+    // state is CSS keyed on the absence of this attribute, so an element
+    // that is never marked is an element that is never shown - skipping the
+    // lightbox outright swapped one bug (permanently open) for its mirror
+    // image (permanently invisible, and with it every photo on the page).
+    el.dataset.arrived = "";
+  }
+
   for (const child of Array.from(main.children)) {
     if (!(child instanceof HTMLElement)) continue;
     if (child.tagName === "SECTION" && child.childElementCount > 0) {
       for (const grand of Array.from(child.children)) {
-        if (grand instanceof HTMLElement) units.push(grand);
+        if (grand instanceof HTMLElement) consider(grand);
       }
     } else {
-      units.push(child);
+      consider(child);
     }
   }
   return units;

@@ -157,6 +157,37 @@ body > footer {
   transform: translateY(10px);
 }
 
+/* ---------- Text over the scene ----------
+   Inner pages now frame their object closer and further left, so it runs
+   behind the content column instead of sitting in the margin beside it.
+   The scrim was carrying legibility on its own before that, and the only
+   way for it to keep doing so would have been to turn the density back up
+   - which flattens the object into wallpaper and undoes the change.
+
+   A halo in the page's own background colour carries it locally instead:
+   contrast where each glyph actually needs it, and nothing at all in the
+   gaps between words, so the nebula behind a paragraph stays visible
+   between the lines. Two shadows, a tight one for edge definition against
+   a bright star and a wide soft one to lift the whole block off a busy
+   field.
+
+   Scoped to backdrop mode, so the homepage - whose text sits in a column
+   the objects are framed clear of - is untouched. */
+#home-cosmos[data-cosmos-mode="backdrop"] ~ main,
+#home-cosmos[data-cosmos-mode="backdrop"] ~ footer {
+  text-shadow:
+    0 0 3px var(--color-bg),
+    0 0 8px var(--color-bg),
+    0 1px 18px var(--color-bg);
+}
+
+/* Headings sit largest and brightest and need the least help; the halo at
+   full strength on 2.2rem type reads as a glow rather than as contrast. */
+#home-cosmos[data-cosmos-mode="backdrop"] ~ main h1,
+#home-cosmos[data-cosmos-mode="backdrop"] ~ main h2 {
+  text-shadow: 0 1px 16px var(--color-bg);
+}
+
 /* ---------- Drag to look ----------
    The homepage's <main> is a scroll track with nothing in it but the menu,
    and the scene behind it is the content - so the whole surface is
@@ -187,23 +218,31 @@ body > footer {
    <main> is server-rendered and says the page opted in; the one on <html>
    is set by an inline head script and says JavaScript is running and
    motion is welcome. A visitor with neither gets the page exactly as it
-   was before any of this existed. */
+   was before any of this existed.
+
+   Arrival only ever *removes* a hidden state - it never asserts a visible
+   one. That distinction is not cosmetic: the first version set opacity:1
+   on everything it had revealed, which quietly overrode the Photography
+   lightbox's own closed state (.viewer is a child of <main>, so it was a
+   reveal unit like any other) and left a full-screen overlay sitting open
+   over the page. Anything that manages its own visibility has to be able
+   to keep managing it once this is done, so the arrived state is the
+   absence of a rule rather than the presence of one. lib/arrive.ts skips
+   out-of-flow elements for the same reason. */
 html[data-arrive] main[data-arrive] > :not(section),
 html[data-arrive] main[data-arrive] > section > * {
-  opacity: 0;
-  transform: translateY(14px);
   transition:
     opacity 560ms ease,
     transform 560ms cubic-bezier(0.22, 0.7, 0.24, 1);
+}
+
+html[data-arrive] main[data-arrive] > :not(section):not([data-arrived]),
+html[data-arrive] main[data-arrive] > section > :not([data-arrived]) {
+  opacity: 0;
+  transform: translateY(14px);
   /* The rise is the only transform these elements carry, so promoting them
      for the length of it avoids re-rasterizing text on every frame. */
   will-change: opacity, transform;
-}
-
-html[data-arrive] main[data-arrive] [data-arrived] {
-  opacity: 1;
-  transform: none;
-  will-change: auto;
 }
 
 /* The cosmos canvas is persisted and rendering live right through the
