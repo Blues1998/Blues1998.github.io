@@ -2123,7 +2123,7 @@
       playground: 0.7,   // luminous but diffuse
       projects: 0.85,    // thin near-white rings, and they cross everything
       music: 0.72,      // small core, but the beams are bright and sweep
-      contact: 1,        // dim overall, but the dish is lit and it turns
+      contact: 0.55,     // dim overall; the manifest carries its own wash
     };
 
     const glareVec = new THREE.Vector3();
@@ -3279,7 +3279,7 @@
 
       starfield.group.position.copy(camera.position);
       starfield.update(dt, tiltX, tiltY);
-      skyEvents.update(dt, standoff, camera.position);
+      skyEvents.update(dt, standoff, camera.position, cosmosMode === "backdrop");
       motionClock.advance(dt);
       if (transitDust) {
         transitDust.update(camera.position.z - prevCameraZ, standoff, camera.position, dt);

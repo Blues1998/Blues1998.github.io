@@ -25,7 +25,7 @@ import { easeFactor } from "./timing";
 // end and swallow the frame at the other.
 export interface SkyEvents {
   object: THREE.Object3D;
-  update(dt: number, standoff: number, cameraPos: THREE.Vector3): void;
+  update(dt: number, standoff: number, cameraPos: THREE.Vector3, clearOfColumn?: boolean): void;
   dispose(): void;
 }
 
@@ -166,12 +166,22 @@ export function createSkyEvents(accent: THREE.Color, reduceMotion: boolean): Sky
   let novaWait = range(NOVA_GAP);
   let novaT = -1; // negative means dormant
 
-  function placeNova() {
+  function placeNova(clearOfColumn: boolean) {
     // Within the forward cone rather than anywhere on the hemisphere. The
     // rarity that makes this worth having is *temporal*; spreading it over
     // a sphere as well would mean most of the few that ever fire went off
     // behind the viewer, which is rarity nobody gets anything out of.
-    const a = Math.random() * Math.PI * 2;
+    //
+    // On inner pages it is confined further, to the right half - the side
+    // the object is framed on and the side the reading column does not
+    // occupy. This is the one event bright enough and long-lived enough to
+    // matter for legibility: eighteen seconds at full brightness, and
+    // measured directly it took a paragraph from 7:1 to 4.2:1 for the
+    // duration when it happened to fire behind one. The homepage keeps the
+    // full circle, since its text is a narrow readout down the left.
+    const a = clearOfColumn
+      ? (Math.random() - 0.5) * Math.PI
+      : Math.random() * Math.PI * 2;
     const r = 0.12 + Math.random() * 0.42;
     nova.position.set(Math.cos(a) * r * SKY_RADIUS, Math.sin(a) * r * SKY_RADIUS * 0.7, -SKY_RADIUS);
   }
@@ -181,7 +191,7 @@ export function createSkyEvents(accent: THREE.Color, reduceMotion: boolean): Sky
   return {
     object: group,
 
-    update(dt, standoff, cameraPos) {
+    update(dt, standoff, cameraPos, clearOfColumn = false) {
       if (reduceMotion || standoff <= 0) return;
 
       group.position.copy(cameraPos);
@@ -245,7 +255,7 @@ export function createSkyEvents(accent: THREE.Color, reduceMotion: boolean): Sky
         novaWait -= dt;
         if (novaWait <= 0) {
           novaT = 0;
-          placeNova();
+          placeNova(clearOfColumn);
           nova.visible = true;
         }
       } else {

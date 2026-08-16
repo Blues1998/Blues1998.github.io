@@ -3,12 +3,19 @@
    page, so whatever the camera is framing decides whether the links are
    readable. A wash and a blur make the bar a fixture of the site rather
    than six words floating over a nebula. Only inner pages render it: the
-   homepage passes hideChrome, so the title screen stays uninterrupted. */
+   homepage passes hideChrome, so the title screen stays uninterrupted.
+
+   A wash and no blur, unlike every other surface here. These two are the
+   full width of the viewport, and a backdrop-filter over a canvas that
+   repaints every frame costs a full-width copy and blur every frame with
+   it: measured, it took Contact from 0.0% dropped frames to 17.8% and
+   Photography to 6.6%. The cards and the toolbar keep theirs - they are
+   small regions, and there the blur is doing real work by defocusing what
+   shows through behind the text. Here it was only ever decoration, and the
+   contrast comes from the wash. */
 nav {
   border-bottom: 1px solid var(--color-border);
-  background: color-mix(in srgb, var(--color-bg) 55%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--color-bg) 72%, transparent);
 }
 
 .nav-container {
@@ -69,9 +76,7 @@ nav {
 footer {
   border-top: 1px solid var(--color-border);
   margin-top: var(--space-6);
-  background: color-mix(in srgb, var(--color-bg) 55%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--color-bg) 72%, transparent);
 }
 
 .footer-container {
@@ -227,16 +232,18 @@ footer {
    the 13px labels passed or failed depending on where it happened to be
    pointing when measured. The glare shield is already at full strength on
    this route; a shield centred on the probe's body cannot track a bright
-   part that orbits it. */
+   part that orbits it.
+
+   No blur here either, for the reason spelled out on nav above: this is a
+   wide element over a canvas that repaints every frame, and it alone kept
+   Contact at 12.5% dropped frames after the nav and footer blurs came off. */
 .channels {
   list-style: none;
   margin: 0;
   padding: 0 var(--space-3);
   display: grid;
   gap: var(--space-1);
-  background: color-mix(in srgb, var(--color-bg) 50%, transparent);
-  backdrop-filter: blur(var(--surface-blur));
-  -webkit-backdrop-filter: blur(var(--surface-blur));
+  background: color-mix(in srgb, var(--color-bg) 68%, transparent);
 }
 
 .channels li {
