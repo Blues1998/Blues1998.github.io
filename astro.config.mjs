@@ -17,6 +17,13 @@ export default defineConfig({
 
   integrations: [
     react(),
-    sitemap(),
+    sitemap({
+      // The terminal is an unlinked easter egg (press ~) and already
+      // carries <meta name="robots" content="noindex">. Listing it in the
+      // sitemap told crawlers to index the very page the page itself asks
+      // them not to - a contradiction that wastes crawl budget and can be
+      // reported as a coverage error in Search Console.
+      filter: (page) => !/\/terminal\/?$/.test(new URL(page).pathname),
+    }),
   ],
 });

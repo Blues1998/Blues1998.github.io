@@ -7,8 +7,14 @@ const isExternal = href ? /^https?:\/\//.test(href) : false;
 const resolvedHref = !href ? undefined : isExternal ? href : `${base}${href.replace(/^\//, "")}`;
 ---
 
+{/* h2, not h3. Each card is a top-level item under the page's only <h1>
+    ("Projects"), so h3 skipped a level and left the page announcing
+    h1 -> h3 with nothing in between - which is what a screen reader user
+    navigating by heading hears as a missing section. The card keeps its
+    existing h3 appearance via .project-card h2 in components.css; this
+    changes the outline, not the design. */}
 <article class="project-card">
-  <h3>
+  <h2>
     {resolvedHref ? (
       isExternal ? (
         <a href={resolvedHref} target="_blank" rel="noopener noreferrer">{title}</a>
@@ -19,7 +25,7 @@ const resolvedHref = !href ? undefined : isExternal ? href : `${base}${href.repl
       title
     )}
     {isPrivate && <span class="project-private-badge">Private</span>}
-  </h3>
+  </h2>
 
   <p class="project-meta">{summary}</p>
 

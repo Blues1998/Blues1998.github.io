@@ -495,6 +495,22 @@ footer::before {
   transform: translateY(-2px);
 }
 
+/* The card title is an h2 so the page outline runs h1 -> h2 rather than
+   skipping a level, but a card is not a section of the page and should
+   not wear the machined, tracked uppercase that names one. These three
+   declarations are exactly the base h2 rules put back to the h3 values
+   the card was designed with, so the correction is structural only.
+
+   Safe from the station counter and divider on section headings: those
+   are scoped to `main > section > h2`, and this sits several levels
+   deeper inside the grid. */
+.project-card h2 {
+  font-size: var(--font-size-lg);
+  text-transform: none;
+  letter-spacing: normal;
+  margin-bottom: var(--space-2);
+}
+
 .project-meta {
   font-size: var(--font-size-sm);
   color: var(--color-text-soft);
