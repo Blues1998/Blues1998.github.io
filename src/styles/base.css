@@ -79,12 +79,64 @@ main > section > h2 {
   gap: var(--space-2);
 }
 
+/* The divider is a scale, not a border: a hairline with a tick standing at
+   its head, matching the ruled edges the header and footer close the page
+   with. It still fades out to the right, so it reads as a measurement
+   running off toward the object the page is named after rather than as a
+   box being drawn around the heading. */
 main > section > h2::after {
   content: "";
   flex: 1;
-  height: 1px;
-  background: linear-gradient(to right, var(--color-border), transparent);
+  height: 5px;
+  background:
+    linear-gradient(var(--hud-tick), var(--hud-tick)) left top / 1px 5px no-repeat,
+    linear-gradient(to right, var(--hud-line-bright), transparent) left top / 100% 1px no-repeat;
 }
+
+/* ---------- Stations ----------
+   Each <section> is a station on the approach (lib/approach.ts marks which
+   one you are at, and drives the matching tick on the scale down the left
+   edge). Numbering the headings is what connects the two: the rail says
+   which mark is lit, the heading says which station that is.
+
+   A counter rather than a number typed into the markup, so a page that
+   gains or loses a section renumbers itself and cannot disagree with the
+   rail, which counts the same elements.
+
+   The count starts at the first <section> - the one carrying the page's
+   <h1> - so the first *heading* to show a number is 02. That is correct
+   rather than off by one: the title block is station 01, and it is already
+   labelled, by the page kicker above it. */
+main[data-arrive] {
+  counter-reset: station;
+}
+
+main[data-arrive] > section {
+  counter-increment: station;
+}
+
+main[data-arrive] > section > h2::before {
+  content: counter(station, decimal-leading-zero);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+  transition: color var(--transition-base);
+}
+
+/* The station you are reading. Only the index changes colour - never the
+   heading, never the prose. Text that restyles itself as you scroll past
+   is a costume; the point of marking the active station is to tie the page
+   to the rail, and the rail is what the accent belongs on. */
+main[data-arrive] > section[data-station="active"] > h2::before {
+  color: var(--color-accent-bright);
+}
+
+/* Deliberately no treatment for passed or upcoming stations beyond the
+   default above. Dimming text you have already read is the obvious move
+   and it is wrong twice over: it fails contrast on a scene this bright at
+   any opacity low enough to read as "behind you", and it makes going back
+   to re-read something a worse experience than reading it the first time. */
 
 p {
   margin-top: 0;
@@ -234,8 +286,15 @@ main[data-arrive] > section {
   margin-bottom: var(--space-4);
 }
 
+/* Viewport-relative rather than the flat 4rem this was, because the gap
+   between two stations is now a distance you travel and not only a
+   typographic break. These pages are short - About is four sections and
+   fits in a screen and a half - and at a fixed 4rem the entire approach
+   played out inside 440px of scroll, which arrives as a lurch rather than
+   as a leg. The clamp keeps the floor at what it always was, so nothing
+   gets tighter on a small window. */
 main[data-arrive] > section:has(> h1, > h2, > h3) {
-  margin-top: var(--space-6);
+  margin-top: clamp(4rem, 13vh, 8rem);
 }
 
 main[data-arrive] > section:first-child {

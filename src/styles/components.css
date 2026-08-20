@@ -13,9 +13,41 @@
    small regions, and there the blur is doing real work by defocusing what
    shows through behind the text. Here it was only ever decoration, and the
    contrast comes from the wash. */
-nav {
-  border-bottom: 1px solid var(--color-border);
+/* Scoped to a class, not the bare `nav` element.
+   There are four other <nav>s on this site - the homepage's dot indicator,
+   its hidden section links, its narrow-viewport fallback menu, and the
+   departure card at the foot of every inner page - and a bare element
+   selector handed all of them the header's wash and its ruled edge. The
+   departure card was rendering with a row of header ticks across its
+   bottom, which is how this surfaced. */
+.site-nav {
+  position: relative;
   background: color-mix(in srgb, var(--color-bg) 72%, transparent);
+}
+
+/* The panel's lower edge, as a graduated rule rather than a border.
+   A plain 1px line is a box edge; a line carrying regular ticks is a scale,
+   and that single difference is most of what separates a header from an
+   instrument. Drawn as two stacked gradients on one pseudo-element - no
+   extra DOM, no per-frame cost, and it cannot be caught by the backdrop
+   the way a real bordered element over a live canvas would be. */
+.site-nav::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  pointer-events: none;
+  background:
+    /* the ticks, dropping down from the rule every 40px */
+    repeating-linear-gradient(
+      to right,
+      var(--hud-tick) 0 1px,
+      transparent 1px 40px
+    ) top / 100% 3px no-repeat,
+    /* the rule itself */
+    linear-gradient(var(--hud-line), var(--hud-line)) top / 100% 1px no-repeat;
 }
 
 .nav-container {
@@ -25,6 +57,37 @@ nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.nav-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+/* ---------- HUD annotation ----------
+   A standing note in the instrument voice, marked as an annotation rather
+   than a reading. Used sparingly and on purpose: the mark stops meaning
+   "this is a machine annotation" the moment everything on the page carries
+   it, and at that point it is just a decorative slash. */
+.hud-label {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 400;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.hud-label::before {
+  content: "// ";
+  color: var(--color-accent);
+}
+
+.nav-tagline {
+  white-space: nowrap;
 }
 
 /* The homepage sets this same name in tracked monospace as the first thing
@@ -50,12 +113,38 @@ nav {
 .nav-links {
   list-style: none;
   display: flex;
-  gap: var(--space-3);
   margin: 0;
   padding: 0;
 }
 
+/* Vertical rules between the stations, not gaps.
+   Six evenly spaced words read as a list of options; six words in ruled
+   cells read as a row of channels on a panel, which is the whole point.
+   Drawn on the <li> rather than as a border on the link so it spans the
+   full cell height regardless of how tall the two stacked lines inside
+   happen to be. */
+.nav-links li {
+  position: relative;
+  padding: 0 var(--space-2);
+}
+
+.nav-links li + li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.1em;
+  bottom: 0.1em;
+  width: 1px;
+  background: var(--hud-line);
+}
+
+/* Index over label. Stacking them is what turns a word into a numbered
+   channel; inline, the number reads as part of the name. */
 .nav-links a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   letter-spacing: var(--track-label);
@@ -64,8 +153,45 @@ nav {
   transition: color var(--transition-fast);
 }
 
+/* --color-muted, the same as the label it sits over, and NOT --hud-tick.
+   The tick colour is right for the ruled edges - they are decorative
+   graphics - and wrong here, because this is text: at 0.3 alpha over the
+   nav wash it measures about 2.4:1 against a 4.5:1 requirement. Being
+   aria-hidden does not exempt it; it is hidden from a screen reader
+   precisely because it is a *sighted* wayfinding aid, which is the one
+   audience that has to be able to read it.
+
+   So the rank between index and label is carried by size and tracking
+   rather than by dimming, which is where it should have been anyway. */
+.nav-index {
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  color: var(--color-muted);
+  transition: color var(--transition-fast);
+}
+
 .nav-links a:hover {
   color: var(--color-text);
+}
+
+.nav-links a:hover .nav-index {
+  color: var(--color-accent-bright);
+}
+
+@media (max-width: 900px) {
+  /* The stacked index is the first thing to go when the row has to wrap:
+     at that width the panel needs its horizontal space for the names, and
+     a wrapped two-line cell reads as a broken layout rather than as a
+     channel. The numbering survives on the page kicker and the approach
+     scale, which is where a visitor on a small screen is reading it. */
+  .nav-index {
+    display: none;
+  }
+
+  .nav-links li {
+    padding: 0 var(--space-1);
+  }
 }
 
 /* ---------- Footer ---------- */
@@ -74,9 +200,29 @@ nav {
    time you have scrolled there - on Contact that is the probe's lit dish,
    directly behind the link row. */
 footer {
-  border-top: 1px solid var(--color-border);
+  position: relative;
   margin-top: var(--space-6);
   background: color-mix(in srgb, var(--color-bg) 72%, transparent);
+}
+
+/* The header's rule, mirrored: ticks rising from the line rather than
+   dropping from it, so the two edges read as a matched pair bracketing the
+   page instead of the same graphic used twice. */
+footer::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 4px;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      to right,
+      var(--hud-tick) 0 1px,
+      transparent 1px 40px
+    ) bottom / 100% 3px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) bottom / 100% 1px no-repeat;
 }
 
 .footer-container {
@@ -155,23 +301,37 @@ footer {
 
 
 /* ---------- Active nav link ----------
-   Colour alone was carrying this, and against five muted siblings that is a
-   weak signal at 13px. The accent rule under the current destination is the
-   same language the photography view tabs already use. */
+   The one lit element in the panel. Colour alone was carrying this, and
+   against five muted siblings that is a weak signal at 13px; a flat accent
+   rule was the improvement on that, and this is the same rule with the
+   light actually on - a short bar, centred under the name rather than run
+   to the cell edges, so it reads as a marker sitting at a position on the
+   scale instead of as an underline belonging to the word.
+
+   The glow is the only one on the site (--hud-glow exists so it stays that
+   way). An indicator that shares its treatment with anything else has
+   stopped indicating. */
 .nav-links a[aria-current="page"] {
   position: relative;
   color: var(--color-text);
   font-weight: 500;
 }
 
+.nav-links a[aria-current="page"] .nav-index {
+  color: var(--color-accent-bright);
+}
+
 .nav-links a[aria-current="page"]::after {
   content: "";
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -0.45em;
-  height: 1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1.4rem;
+  bottom: -0.5em;
+  height: 2px;
+  border-radius: 1px;
   background: var(--color-accent);
+  box-shadow: var(--hud-glow);
 }
 
 /* ---------- Responsive navigation ---------- */
@@ -187,9 +347,22 @@ footer {
     gap: var(--space-2);
   }
 
+  /* Wrapped rows put the vertical rules in the wrong places - a rule at the
+     start of a new line divides nothing - so the row falls back to spacing
+     once it can no longer be a single scale. */
   .nav-links {
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--space-1) 0;
+  }
+
+  .nav-links li + li::before {
+    display: none;
+  }
+
+  /* The tagline is standing annotation, and on a phone the header's whole
+     job is the six names. */
+  .nav-tagline {
+    display: none;
   }
 }
 
@@ -875,4 +1048,249 @@ footer {
   border: none;
   border-top: 1px solid var(--color-border);
   margin: 2rem 0;
+}
+
+/* ---------- The approach scale ----------
+   A scrollbar tells you how much of a file is left. This tells you how far
+   along a leg you are and which station you are at - the same information,
+   restated as position, which is the difference between a page you scroll
+   and a place you are moving through. Built from the page's own <section>
+   list by lib/approach.ts (which also owns the progress value the camera
+   reads), so it never has to be kept in step by hand.
+
+   Everything here is decorative in the accessibility sense and marked
+   aria-hidden: the headings it indexes are already in the document, in
+   order. A visitor without JavaScript never sees it and loses nothing but
+   a progress indicator. */
+.approach-scale {
+  position: fixed;
+  /* Parked just outside the content column rather than against the window
+     edge, so it reads as belonging to the text it indexes. The column is
+     centred at --max-width, so its left edge is at 50% - half that; back
+     off another 4rem and clamp to a sane gutter on narrower windows, where
+     the max() floor takes over before the rail can collide with the words. */
+  left: max(var(--space-3), calc(50% - var(--max-width) / 2 - 4rem));
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  pointer-events: none;
+  /* Fades in with the page rather than snapping on before the content it
+     describes has arrived. */
+  opacity: 0;
+  animation: approach-scale-in 600ms ease 350ms forwards;
+}
+
+@keyframes approach-scale-in {
+  to { opacity: 1; }
+}
+
+/* The destination index, in the homepage's own voice - this is the same
+   "05 / 06" the menu showed on the way here, which is the point: the
+   number you clicked is the number you are travelling under. */
+.approach-index {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--track-label);
+  color: var(--color-muted);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.approach-rail {
+  position: relative;
+  width: 1px;
+  height: clamp(7rem, 22vh, 12rem);
+  background: var(--color-border);
+}
+
+/* Distance covered. Scaled rather than resized: transform is a compositor
+   property, and this element is written on every scroll frame. */
+.approach-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-accent) 45%, transparent),
+    var(--color-accent)
+  );
+  transform-origin: top;
+  /* --fill is written by lib/approach.ts on every scroll frame; which axis
+     it means is settled here and in the flat-rail fallback below. Scaled
+     rather than resized because transform is a compositor property. */
+  transform: scaleY(var(--fill, 0));
+}
+
+/* One mark per station. Sits centred on the rail; the active one grows a
+   short bar out to the right of it, toward the text it belongs to. */
+.approach-tick {
+  position: absolute;
+  /* --tick-pos is set per tick by lib/approach.ts as a percentage along the
+     rail. Which axis that percentage means is a CSS question, not a script
+     one, so the script stays axis-agnostic and the horizontal fallback
+     below just reads it on the other axis - no resize listener, no
+     rebuilding the rail when the breakpoint is crossed. */
+  top: var(--tick-pos, 0%);
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: var(--color-border);
+  transition:
+    background-color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+.approach-tick[data-state="passed"] {
+  background: color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+
+.approach-tick[data-state="active"] {
+  background: var(--color-accent-bright);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+/* A page with nothing to scroll has no leg to fly - Photography is six
+   frames and Contact is three channels, and both fit on one screen. A
+   gauge pinned at zero reads as broken, and a rail with the line taken out
+   from under it leaves its station marks floating unattached to anything.
+   So the whole rail goes and the destination index stands alone: you have
+   arrived, there is nothing further to travel, which is the truth. */
+.approach-scale[data-travelable="false"] .approach-rail {
+  display: none;
+}
+
+/* Below the point where the content column stops leaving a left margin,
+   the rail has nowhere to stand without sitting on the words. It becomes a
+   hairline across the top of the viewport instead - the same information,
+   the same fill, in the one strip that is always free. Deliberately not
+   hidden: on a phone there is no cosmos scene behind the text (the six
+   objects are gated at 900px), so this and the star-field swing are the
+   only things carrying the sense of travel at all. */
+@media (max-width: 1099px) {
+  .approach-scale {
+    left: 0;
+    right: 0;
+    top: 0;
+    transform: none;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+    height: 2px;
+  }
+
+  .approach-index {
+    display: none;
+  }
+
+  .approach-rail {
+    width: 100%;
+    height: 100%;
+  }
+
+  .approach-fill {
+    transform-origin: left;
+    transform: scaleX(var(--fill, 0));
+    /* The vertical rail's gradient runs top-to-bottom, which on a flat rail
+       would fade along the wrong axis and leave the leading edge washed
+       out - the one part of it that has to read clearly. */
+    background: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--color-accent) 45%, transparent),
+      var(--color-accent)
+    );
+  }
+
+  .approach-tick {
+    top: 50%;
+    left: var(--tick-pos, 0%);
+    width: 3px;
+    height: 3px;
+    margin: -1.5px 0 0 -1.5px;
+  }
+}
+
+/* ---------- The departure ----------
+   The end of the approach: the next destination in journey order, so
+   reaching the bottom of a page aims you at somewhere instead of stopping.
+   Built by lib/approach.ts (which also decides *which* destination, and
+   wraps round from Contact back to Playground).
+
+   Sits on a surface for the same reason the project toolbar does - it is
+   chrome for the journey rather than page content, and the objects it
+   floats over are the brightest things in the scene at the end of a leg,
+   which is exactly where the camera has closed in the most. */
+.departure {
+  max-width: var(--max-width);
+  margin: var(--space-6) auto 0;
+}
+
+.departure-link {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  background-color: var(--surface);
+  backdrop-filter: blur(var(--surface-blur));
+  color: var(--color-text);
+  text-decoration: none;
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base);
+}
+
+.departure-link:hover,
+.departure-link:focus-visible {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  background-color: var(--surface-strong);
+  text-decoration: none;
+}
+
+.departure-label {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--color-text-soft);
+}
+
+.departure-index {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  letter-spacing: var(--track-label);
+  color: var(--color-accent-bright);
+}
+
+.departure-name {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-lg);
+  text-transform: uppercase;
+  letter-spacing: var(--track-label);
+}
+
+/* The arrow travels on hover - the one piece of motion here, and it points
+   the way the camera is about to go. */
+.departure-name::after {
+  content: "→";
+  display: inline-block;
+  margin-left: 0.6em;
+  color: var(--color-accent);
+  transition: transform var(--transition-base);
+}
+
+.departure-link:hover .departure-name::after,
+.departure-link:focus-visible .departure-name::after {
+  transform: translateX(0.25em);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .departure-name::after {
+    transition: none;
+  }
 }

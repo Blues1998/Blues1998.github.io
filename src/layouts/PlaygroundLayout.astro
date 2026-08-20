@@ -36,8 +36,13 @@ const socialImage = new URL("/images/og-default.png", Astro.site);
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- IBM Plex Mono is here because this layout imports tokens.css and
+         base.css, so --font-mono resolves on these pages too - without the
+         face, the playground would silently render the instrument voice in
+         a system mono while every other route showed Plex. Manrope and the
+         heavier Inter are the playground's own display faces and stay. -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap"
       rel="stylesheet"
     />
   </head>

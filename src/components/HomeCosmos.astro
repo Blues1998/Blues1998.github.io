@@ -185,6 +185,7 @@
   import { createSkyEvents } from "../lib/cosmos/skyEvents";
   import { applyGalaxyShear, applyNebulaDrift, createMotionClock } from "../lib/cosmos/pointMotion";
   import { MAX_STEP, easeFactor } from "../lib/cosmos/timing";
+  import { DESTINATIONS } from "../lib/destinations";
 
   const LOG = "[HomeCosmos]";
 
@@ -1754,6 +1755,22 @@
     // waypointDepths() needs it and that runs during the first resize().
     const DEPTH_ORDER: CosmosKey[] = ["playground", "projects", "photography", "music", "about", "contact"];
 
+    // Same sequence the homepage menu and the inner pages' approach scale
+    // index against (lib/destinations.ts). It stays declared separately
+    // because here it is also a depth ordering for the scene graph, typed
+    // against CosmosKey - but a silent disagreement would mean the "02 / 06"
+    // you clicked and the "02 / 06" you land under refer to different
+    // objects, so it is checked rather than trusted. Dev-only: the whole
+    // block drops out of the production bundle.
+    if (import.meta.env.DEV && DEPTH_ORDER.join() !== DESTINATIONS.map((d) => d.slug).join()) {
+      console.warn(
+        "[cosmos] DEPTH_ORDER and lib/destinations.ts disagree:",
+        DEPTH_ORDER.join(),
+        "vs",
+        DESTINATIONS.map((d) => d.slug).join(),
+      );
+    }
+
     const objectExtent: Partial<Record<CosmosKey, { x: number; y: number; z: number }>> = {};
     const measureBox = new THREE.Box3();
     const measureSize = new THREE.Vector3();
@@ -2299,6 +2316,13 @@
     const defocusWasVisible: boolean[] = [];
     const objectWorldPos = new THREE.Vector3();
     const framedTarget = new THREE.Vector3();
+    // Written by computeCameraTarget alongside framedTarget, for the same
+    // reason that function exists at all: the animation loop and the
+    // instant (reduced-motion) path both hand the result to the rig, and a
+    // second place deciding the orbit angle is a second place for the two
+    // to disagree about what shot the page is in.
+    let framedYaw = 0;
+    let framedPitch = 0;
     const cullWorldPos = new THREE.Vector3();
     // Roughly 0.6% of the frame height at this field of view. Below that an
     // object is a couple of pixels; the depth haze has it near the dim floor
@@ -2415,6 +2439,52 @@
     function backdropStandoffMultiplier(): number {
       return window.innerWidth >= 1100 ? 0.86 : 1.3;
     }
+
+    // ---- The approach ----
+    //
+    // An inner page is the last leg of the homepage's journey rather than a
+    // document with a picture behind it, so its scroll drives the camera
+    // too: reading down the page closes on the object the page is named
+    // after and swings a little way around it. lib/approach.ts owns the
+    // progress value (see the ownership note there); this only consumes it.
+    //
+    // t = 0 is deliberately the exact pose that shipped before any of this
+    // existed - the multiplier is 1, the orbit angles are 0 - which means a
+    // page too short to scroll, a visitor who never scrolls, and reduced
+    // motion all land on the shot that was already framed and contrast-
+    // verified. The approach can only ever move away from a known-good
+    // starting point, never into one.
+    function approachProgress(): number {
+      return window.__approach?.t ?? 0;
+    }
+
+    // How much of the standoff is given up by the end of the leg. 0.62 is
+    // a real closing - the object roughly half again as large in frame -
+    // without crossing into the range where it fills the column behind the
+    // text and the glare shield has to do all the work.
+    const APPROACH_CLOSE = 0.62;
+    // Radians of orbit at t = 1: ~17 degrees of yaw and ~5 of rise. Kept
+    // small on purpose. This is the difference between a zoom and a pass -
+    // the probe shows a different face of itself, the galaxy's disc opens
+    // slightly - but past about 25 degrees the framing offset starts having
+    // to fight the perspective to keep the object off the text.
+    const APPROACH_YAW = 0.3;
+    const APPROACH_PITCH = 0.09;
+    // Star-field swing over the leg, in the same units the mouse tilt uses
+    // (which peaks around 0.04), so this is an order of magnitude larger -
+    // deliberately. Mouse tilt is meant to be felt and not noticed; this is
+    // meant to be the thing that tells a phone visitor, who has no scene,
+    // that they are moving.
+    const APPROACH_SWING = 0.5;
+
+    // Below 1100px framingOffsetX recentres the object behind the column
+    // and backdropStandoffMultiplier pushes it back to compensate (see
+    // both). Closing in there would walk a bright object straight into the
+    // paragraph the visitor is reading, so the leg is flown at a fraction
+    // of its width - present, but not at the cost of the words.
+    function approachScale(): number {
+      return window.innerWidth >= 1100 ? 1 : 0.35;
+    }
     let cosmosMode: "hero" | "backdrop" = "hero";
 
     // ---- Warp dive (see the cosmos:warp handler below for the full
@@ -2470,6 +2540,13 @@
     // two can't drift apart.
     function computeCameraTarget(out: THREE.Vector3): number {
       let standoff: number;
+      // Straight-on unless the backdrop branch below says otherwise. Set
+      // here rather than in each of the other branches so that a shot which
+      // never mentions orbit cannot inherit the previous frame's angle -
+      // navigating from the bottom of a page into a warp dive did exactly
+      // that, and the dive arrived crabbing.
+      framedYaw = 0;
+      framedPitch = 0;
       if (warpKey && objects[warpKey]) {
         // Mid-navigation: overrides both the scroll journey and hover
         // focus, so the dive can't be fought by whatever the page happens
@@ -2522,6 +2599,12 @@
       } else if (focusKey) {
         objects[focusKey]!.getWorldPosition(objectWorldPos);
         standoff = standoffFor(focusKey) * (cosmosMode === "backdrop" ? backdropStandoffMultiplier() : 1);
+        if (cosmosMode === "backdrop") {
+          const t = approachProgress() * approachScale();
+          standoff *= THREE.MathUtils.lerp(1, APPROACH_CLOSE, t);
+          framedYaw = APPROACH_YAW * t;
+          framedPitch = APPROACH_PITCH * t;
+        }
       } else if (isDesktop) {
         // Homepage with the loop never running (reduced motion): settle on
         // the first waypoint rather than the origin, which is now empty
@@ -2537,10 +2620,22 @@
       // into real parallax: the same world-space sway subtends a large
       // angle for the object being visited and almost nothing for one a
       // thousand units further out.
+      //
+      // The framing offset is applied along the camera's *right* vector,
+      // not along world x. With no orbit the two are the same thing and
+      // this reduces to the original expression; once the approach starts
+      // swinging the camera round they are not, and offsetting in world x
+      // would let the object drift back toward the centre of the frame -
+      // i.e. onto the text - by cos(yaw) as the leg played out. Every
+      // contrast guarantee on these pages rests on the object staying put
+      // in frame, so the offset has to rotate with the camera.
+      const offsetX = framingOffsetX(standoff);
+      const rightX = Math.cos(framedYaw);
+      const rightZ = -Math.sin(framedYaw);
       out.set(
-        objectWorldPos.x - framingOffsetX(standoff) + (tiltY + dragTiltY) * standoff * 0.35,
+        objectWorldPos.x - offsetX * rightX + (tiltY + dragTiltY) * standoff * 0.35,
         objectWorldPos.y - (tiltX + dragTiltX) * standoff * 0.35,
-        objectWorldPos.z,
+        objectWorldPos.z - offsetX * rightZ,
       );
       return standoff;
     }
@@ -2782,7 +2877,7 @@
           blurCurrent[key] = blurBase[key];
         });
       }
-      cameraRig.setTarget(framedTarget, standoff);
+      cameraRig.setTarget(framedTarget, standoff, framedYaw, framedPitch);
       cameraRig.snapToTarget();
       starfield.group.position.copy(camera.position);
       if (instant) {
@@ -3263,7 +3358,7 @@
       });
 
       const standoff = computeCameraTarget(framedTarget);
-      cameraRig.setTarget(framedTarget, standoff);
+      cameraRig.setTarget(framedTarget, standoff, framedYaw, framedPitch);
       // The idle 0.06 is a ~270ms lag to catch 63% of a move. That is fine
       // for a hover preview and far too slow for a scroll-driven camera:
       // scrolling at any speed left the rig permanently chasing a target it
@@ -3278,7 +3373,18 @@
       updateGlare(dt);
 
       starfield.group.position.copy(camera.position);
-      starfield.update(dt, tiltX, tiltY);
+      // The approach swings the star field as well as the camera, and this
+      // is the one piece of it that is *not* gated to the desktop scene.
+      //
+      // Below 900px there are no six objects to close on - that gate is in
+      // deviceTier - so without this an inner page on a phone would have
+      // the approach scale telling the visitor they are travelling and
+      // nothing behind the words agreeing. The layers rotate by their own
+      // parallaxFactor, so the near field swings further than the far one
+      // and the result reads as depth rather than as a rotating backdrop.
+      // On desktop it rides on top of the camera move and costs nothing.
+      const swing = approachProgress() * APPROACH_SWING;
+      starfield.update(dt, tiltX, tiltY + swing);
       skyEvents.update(dt, standoff, camera.position, cosmosMode === "backdrop");
       motionClock.advance(dt);
       if (transitDust) {

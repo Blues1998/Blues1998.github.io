@@ -100,7 +100,7 @@ const arrives = !hideChrome && Astro.url.pathname.replace(/\/+$/, "") !== "";
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
   </head>
@@ -122,6 +122,7 @@ const arrives = !hideChrome && Astro.url.pathname.replace(/\/+$/, "") !== "";
 
     <script>
       import { armArrival, runArrival } from "../lib/arrive";
+      import { bindApproach } from "../lib/approach";
       window.__arriveReady = true;
       // Bound once against the never-swapped document, for the same reason
       // the terminal shortcut below is: this script re-executes on every
@@ -131,6 +132,8 @@ const arrives = !hideChrome && Astro.url.pathname.replace(/\/+$/, "") !== "";
         document.addEventListener("astro:after-swap", armArrival);
         document.addEventListener("astro:page-load", runArrival);
       }
+      // Carries its own guard (see lib/approach.ts) for the same reason.
+      bindApproach();
     </script>
 
     <!-- Hidden terminal trigger. Guarded: with <ClientRouter /> active,

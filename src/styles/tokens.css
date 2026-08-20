@@ -43,11 +43,18 @@
   /* ---------- Typography ---------- */
   --font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-heading: "Space Grotesk", "Inter", system-ui, sans-serif;
-  /* The instrument voice. Deliberately a system stack and not a webfont:
-     the homepage readout (HomeMenu's .home-kicker and .home-journey-*)
-     already draws from exactly this list, so carrying that voice onto the
-     inner pages costs nothing to download. */
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  /* The instrument voice: every label, index, readout and piece of chrome
+     on the site. This was a system stack, chosen so the voice cost nothing
+     to download - but a system stack is a different typeface on every
+     machine, which for the one voice that is supposed to read as *the
+     instrument* means the panel is built out of whatever the visitor
+     happens to have. IBM Plex Mono is drawn for exactly this job: technical
+     text at small sizes, wide tracking, and a lowercase l / uppercase I /
+     digit 1 that stay distinguishable in a coordinate readout.
+
+     The system stack stays behind it as the fallback, so a blocked or slow
+     webfont renders the previous design rather than nothing. */
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
 
   --font-size-base: 18px;
   --line-height-base: 1.65;
@@ -68,6 +75,23 @@
   --track-wide: 0.25em;
   --track-label: 0.14em;
   --track-title: 0.06em;
+
+  /* ---------- HUD ----------
+     The chrome reads as instrumentation laid over the scene rather than as
+     a page containing it: hairlines, ticks, brackets and one lit marker for
+     wherever you are. Held as tokens because every one of these appears in
+     several places (nav, footer, approach scale, section rules) and they
+     have to be the same weight of line in all of them or the panel stops
+     looking machined.
+
+     Deliberately quiet. The astronomical visuals are the subject; this is
+     the glass in front of them, and glass you notice is a smudge. */
+  --hud-line: rgba(255, 255, 255, 0.12);
+  --hud-line-bright: rgba(255, 255, 255, 0.22);
+  --hud-tick: rgba(255, 255, 255, 0.3);
+  /* The lit state. One glow, used only for "you are here" - if more than
+     one thing on screen glows, none of them is an indicator. */
+  --hud-glow: 0 0 6px color-mix(in srgb, var(--color-accent) 70%, transparent);
 
   /* ---------- Layout ---------- */
   --max-width: 70ch;

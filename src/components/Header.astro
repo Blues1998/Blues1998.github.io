@@ -1,4 +1,14 @@
 ---
+/* The site header as an instrument panel.
+ *
+ * The six links are generated from lib/destinations.ts rather than typed
+ * out, which is what lets each one carry its journey index: the "02" beside
+ * Projects here is provably the same 02 the homepage menu showed on the way
+ * in and the same 02 the approach scale shows once you arrive. Hand-written
+ * markup could not promise that.
+ */
+import { DESTINATIONS } from "../lib/destinations";
+
 const base = import.meta.env.BASE_URL;
 
 const normalize = (p) => p.replace(/\/+$/, "");
@@ -16,18 +26,38 @@ const isActive = (path) => {
 };
 ---
 
-<nav aria-label="Primary">
+<nav class="site-nav" aria-label="Primary">
   <div class="nav-container">
-    <a href={`${base}`} class="nav-brand">Animesh Singh</a>
+    <div class="nav-identity">
+      <a href={`${base}`} class="nav-brand">Animesh Singh</a>
+      {/* The one piece of standing text in the panel. Set as a comment in
+          the instrument voice - "//" is the mark that separates an
+          annotation from a reading on every technical display worth
+          copying - and hidden on narrow windows where the header already
+          wraps to two rows. */}
+      <p class="hud-label nav-tagline">Explore. Experiment. Play.</p>
+    </div>
 
     <div class="nav-right">
       <ul class="nav-links">
-        <li><a href={`${base}playground/`} aria-current={isActive("/playground") ? "page" : undefined} data-astro-reload>Playground</a></li>
-        <li><a href={`${base}projects/`} aria-current={isActive("/projects") ? "page" : undefined}>Projects</a></li>
-        <li><a href={`${base}photography/`} aria-current={isActive("/photography") ? "page" : undefined}>Photography</a></li>
-        <li><a href={`${base}music/`} aria-current={isActive("/music") ? "page" : undefined}>Music</a></li>
-        <li><a href={`${base}about/`} aria-current={isActive("/about") ? "page" : undefined}>About</a></li>
-        <li><a href={`${base}contact/`} aria-current={isActive("/contact") ? "page" : undefined}>Contact</a></li>
+        {DESTINATIONS.map((d, i) => (
+          <li>
+            <a
+              href={`${base}${d.slug}/`}
+              aria-current={isActive(`/${d.slug}`) ? "page" : undefined}
+              data-astro-reload={d.hardReload ? true : undefined}
+            >
+              {/* Out of the accessibility tree: a screen reader announcing
+                  "zero two Projects" on every link turns a six-item menu
+                  into twelve tokens of noise. The number is a sighted
+                  wayfinding aid that ties the panel to the page kicker and
+                  the approach scale, and it is decorative in exactly the
+                  way those are. */}
+              <span class="nav-index" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
+              <span class="nav-label">{d.label}</span>
+            </a>
+          </li>
+        ))}
       </ul>
     </div>
   </div>
