@@ -574,6 +574,15 @@ body.playground-page::before {
   color: #ffb298;
 }
 
+/* Live reads green because every other state here is a shade of "not yet",
+   and the one distinction a visitor actually acts on is whether the card
+   opens something. No pulse: the others breathe because they are waiting,
+   and this one is not. */
+.playground-pill-status.status-live {
+  background: rgba(94, 226, 168, 0.14);
+  color: #9df0cb;
+}
+
 .playground-pill-status.status-warming {
   background: rgba(255, 149, 104, 0.14);
   color: #ffc2a7;

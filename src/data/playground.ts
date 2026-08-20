@@ -1,5 +1,9 @@
 export type PlaygroundPanelTone = "ember" | "frost" | "signal";
-export type PlaygroundPanelState = "warming" | "incubating" | "under-observation";
+// "live" is the only state currently in use. The other three describe work
+// that is not yet reachable, and they stay in the union because that is the
+// honest label for the next thing that lands here half-built - but nothing
+// ships wearing one until it is actually true.
+export type PlaygroundPanelState = "live" | "warming" | "incubating" | "under-observation";
 
 export interface PlaygroundPanel {
   slug: string;
@@ -32,46 +36,28 @@ export function groupPlaygroundRows(
   return rows;
 }
 
+// Only things a visitor can actually open and use. The page previously
+// padded this list with four invented chambers ("Vault D-07" and friends)
+// that had no href and never would - a gallery that was four-fifths prop.
+// An empty-looking room reads better than a room full of locked doors, so
+// entries land here when they run, not before.
 export const playgroundPanels: PlaygroundPanel[] = [
   {
     slug: "endless-drive",
     title: "Wander",
     summary: "An endless, procedural scenic drive through the seasons: day and night, weather that rolls in on its own, and a road that never repeats.",
-    statusLabel: "incubating",
+    statusLabel: "live",
     tags: ["three.js", "procedural", "driving"],
     tone: "ember",
     href: "/playground/endless-drive",
   },
   {
-    slug: "chamber-a",
-    title: "Chamber A-03",
-    summary: "A warm vessel for browser matter that has not yet chosen whether it wants to become an interface or an incident.",
-    statusLabel: "warming",
-    tags: ["shell memory", "soft launch", "unsealed"],
-    tone: "ember",
-  },
-  {
-    slug: "field-b",
-    title: "Field B-11",
-    summary: "Static gathers here in patient layers. Something is learning how to glow before it learns how to speak.",
-    statusLabel: "incubating",
-    tags: ["signal drift", "phase one", "light test"],
+    slug: "focus-reader",
+    title: "Focus Reader",
+    summary: "A speed-reading surface that flashes one word at a time, anchored on the letter your eye already lands on. Paste text or drop in a PDF and set your own pace.",
+    statusLabel: "live",
+    tags: ["react", "rsvp", "pdf"],
     tone: "frost",
-  },
-  {
-    slug: "bay-c",
-    title: "Bay C-02",
-    summary: "A quiet chamber for experiments that still prefer atmosphere over explanation and movement over certainty.",
-    statusLabel: "under-observation",
-    tags: ["low pressure", "motion pass", "field notes"],
-    tone: "signal",
-  },
-  {
-    slug: "vault-d",
-    title: "Vault D-07",
-    summary: "The edges are set, the center is unresolved, and the entire structure is waiting for the right disturbance to wake it.",
-    statusLabel: "warming",
-    tags: ["dormant core", "stress map", "hold state"],
-    tone: "ember",
+    href: "/apps/focus-reader/",
   },
 ];
