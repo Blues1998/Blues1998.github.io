@@ -26,6 +26,9 @@ const socialImage = new URL("/images/og-default.png", Astro.site);
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonicalURL} />
     <meta property="og:image" content={socialImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Animesh Singh - software engineer, photographer and musician" />
     <meta property="og:site_name" content="Animesh Singh" />
     <meta property="og:locale" content="en_US" />
 
@@ -33,6 +36,16 @@ const socialImage = new URL("/images/og-default.png", Astro.site);
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={socialImage} />
+    <meta name="twitter:image:alt" content="Animesh Singh - software engineer, photographer and musician" />
+
+    <!-- Same icon set as BaseLayout: these experiment pages are full-screen
+         apps with their own <head>, and a visitor who lands on one directly
+         should get the same tab mark as the rest of the site. -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/images/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/images/icon-180.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#0f1117" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

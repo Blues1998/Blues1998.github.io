@@ -79,6 +79,12 @@ const arrives = !hideChrome && Astro.url.pathname.replace(/\/+$/, "") !== "";
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonicalURL} />
     <meta property="og:image" content={socialImage} />
+    <!-- Dimensions let a scraper reserve the right box before it has
+         fetched the image, which is the difference between a card that
+         renders at full width immediately and one that pops in. -->
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Animesh Singh - software engineer, photographer and musician" />
     <meta property="og:site_name" content="Animesh Singh" />
     <meta property="og:locale" content="en_US" />
 
@@ -87,6 +93,19 @@ const arrives = !hideChrome && Astro.url.pathname.replace(/\/+$/, "") !== "";
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={socialImage} />
+    <meta name="twitter:image:alt" content="Animesh Singh - software engineer, photographer and musician" />
+
+    <!-- Icons. The SVG is the one browsers that support it should use, so
+         it comes first; the .ico is both the legacy fallback and the file
+         that gets served for the bare /favicon.ico that browsers, crawlers
+         and link unfurlers probe regardless of what these tags say. -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/images/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/images/icon-180.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <!-- Paints mobile browser chrome to match the page instead of leaving
+         a white bar above an otherwise fully dark site. -->
+    <meta name="theme-color" content="#0f1117" />
 
     <!-- RSS -->
     <link
