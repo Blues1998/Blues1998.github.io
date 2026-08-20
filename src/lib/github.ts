@@ -29,17 +29,62 @@ function cache(): { repos: Repo[] | null; readmes: Map<string, string | null> } 
   return g.__gh_cache__ as { repos: Repo[] | null; readmes: Map<string, string | null> };
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/* One transient failure here used to take the whole deploy with it.
+ *
+ * This runs at build time, so `throw` meant that a GitHub blip, a
+ * secondary rate limit, or a runner with flaky egress blocked shipping
+ * anything at all - including changes with nothing to do with GitHub.
+ * A 502 from someone else's API is not a reason a CSS fix cannot go out.
+ *
+ * So: retry the retryable, and treat total failure as degraded content
+ * rather than a broken build. 429 and 5xx are worth another attempt;
+ * a 404 on the username never will be, so it fails fast instead of
+ * sleeping through three rounds to reach the same answer.
+ */
+async function fetchRepos(): Promise<Repo[]> {
+  const url = `${BASE}/users/${USERNAME}/repos?type=public&per_page=100&sort=pushed`;
+  const ATTEMPTS = 3;
+  let last = "";
+
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(url, { headers: apiHeaders() });
+      if (res.ok) {
+        const all: (Repo & { fork: boolean; archived: boolean })[] = await res.json();
+        return all.filter((r) => !r.fork && !r.archived);
+      }
+      last = `HTTP ${res.status}`;
+      // 403 with the remaining count at zero is the rate limit wearing a
+      // permissions error's status code; anything else 4xx is a real
+      // answer that will not change on a retry.
+      const rateLimited =
+        res.status === 429 ||
+        (res.status === 403 && res.headers.get("x-ratelimit-remaining") === "0");
+      if (res.status < 500 && !rateLimited) break;
+    } catch (err) {
+      last = err instanceof Error ? err.message : String(err);
+    }
+    if (attempt < ATTEMPTS) await sleep(attempt * 1500);
+  }
+
+  // Loud, because the alternative is a site that quietly ships without a
+  // project and nobody notices until someone goes looking for it.
+  console.warn(
+    `\n[github] Could not reach the GitHub API after ${ATTEMPTS} attempts (${last}).\n` +
+      `[github] Building WITHOUT repo-backed projects: the curated entries in\n` +
+      `[github] src/data/projects.ts still ship, but anything sourced from a\n` +
+      `[github] live repo - and its /projects/<slug>/ detail page - will be\n` +
+      `[github] missing from this build. Re-run once the API is reachable.\n`
+  );
+  return [];
+}
+
 export async function getPublicRepos(): Promise<Repo[]> {
   const c = cache();
   if (c.repos) return c.repos;
-
-  const res = await fetch(
-    `${BASE}/users/${USERNAME}/repos?type=public&per_page=100&sort=pushed`,
-    { headers: apiHeaders() }
-  );
-  if (!res.ok) throw new Error(`GitHub API ${res.status}: ${await res.text()}`);
-  const all: (Repo & { fork: boolean; archived: boolean })[] = await res.json();
-  c.repos = all.filter((r) => !r.fork && !r.archived);
+  c.repos = await fetchRepos();
   return c.repos;
 }
 
