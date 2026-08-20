@@ -549,6 +549,15 @@ footer::before {
   font-weight: 600;
 }
 
+/* Each wrapper is an anchor target (/projects/#<slug>, which is where the
+   RSS feed sends projects that have no public repo and no live demo), so
+   it needs room above it when jumped to - otherwise the card lands flush
+   against the top of the viewport with the page's own heading scrolled
+   off and no context for what you are looking at. */
+.project-card-wrapper {
+  scroll-margin-top: var(--space-5);
+}
+
 /* Project card hidden during filter */
 .project-card-wrapper.hidden {
   display: none;

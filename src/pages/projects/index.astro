@@ -44,9 +44,14 @@ const allTech = [...new Set(projects.flatMap((p) => p.tech))].sort();
     </div>
 
     <div class="project-grid" id="project-grid">
+      {/* Each wrapper carries id={slug}, which makes /projects/#<slug> a
+          real destination. The feed links private-source projects here,
+          since a card describing the work is the most there is to show
+          for one with no public repo and no live demo. */}
       {projects.map((p) => (
         <div
           class="project-card-wrapper"
+          id={p.slug}
           data-techs={JSON.stringify(p.tech)}
         >
           <ProjectCard
