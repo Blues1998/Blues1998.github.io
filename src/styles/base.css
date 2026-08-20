@@ -315,6 +315,50 @@ video {
   outline-offset: 3px;
 }
 
+/* <main> is only focusable as a skip-link target, never by tabbing, so it
+   should not draw a ring around the entire page when it receives focus. */
+main:focus,
+main:focus-visible {
+  outline: none;
+}
+
+/* ---------- Skip link ----------
+   Off-screen until focused rather than display:none, because a hidden
+   element is not focusable and a skip link that cannot be focused is not
+   a skip link. It sits on an opaque surface: everything else on this site
+   is translucent over a live WebGL scene, and the one control whose whole
+   job is to be found instantly by someone who cannot see the page is the
+   wrong place to make text compete with a starfield. */
+.skip-link {
+  position: fixed;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 100;
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  /* Moved rather than hidden, and clipped so it cannot widen the page. */
+  transform: translateY(calc(-100% - var(--space-3)));
+  transition: transform var(--transition-fast);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skip-link {
+    transition: none;
+  }
+}
+
 /* ---------- Page transit ----------
    Navigating the site is a camera move, not a cut. HomeCosmos.astro dives
    the camera toward the destination object, swaps the route while it's

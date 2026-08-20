@@ -125,12 +125,24 @@ const arrives = !hideChrome && Astro.url.pathname.replace(/\/+$/, "") !== "";
   </head>
 
   <body>
+    {/* First focusable thing on the page, and only where there is chrome
+        worth skipping. The header is a brand link plus six destinations,
+        so without this a keyboard or screen-reader visitor traverses
+        seven controls to reach the content - on every page, every time.
+        Visually hidden until focused (see .skip-link). */}
+    {!hideChrome && <a href="#main" class="skip-link">Skip to content</a>}
+
     <HomeCosmos />
 
     {!hideChrome && <Header />}
 
+    {/* tabindex="-1" is what makes the skip link actually move focus.
+        Without it the browser scrolls to <main> but leaves focus in the
+        document, so the next Tab returns to the nav the visitor just
+        asked to skip. It is not reachable by tabbing, only by target. */}
     <main
       id="main"
+      tabindex="-1"
       class={hideChrome ? "main-bare" : undefined}
       data-arrive={arrives ? "" : undefined}
     >
