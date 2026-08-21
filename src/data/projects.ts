@@ -40,13 +40,6 @@ export const privateProjects: CuratedProject[] = [
     sourceIsPrivate: true,
   },
   {
-    slug: "forgeai",
-    title: "ForgeAI",
-    summary: "A local-first, multi-provider AI operating system that autonomously plans, executes, tests, and commits software engineering work.",
-    tech: ["Python", "AI Agents"],
-    sourceIsPrivate: true,
-  },
-  {
     slug: "cadenza",
     title: "Cadenza",
     summary:
