@@ -54,10 +54,10 @@ export const playgroundPanels: PlaygroundPanel[] = [
   {
     slug: "focus-reader",
     title: "Focus Reader",
-    summary: "A speed-reading surface that flashes one word at a time, anchored on the letter your eye already lands on. Paste text or drop in a PDF and set your own pace.",
+    summary: "A speed-reading surface that shows one word at a time, pinned on the letter your eye already lands on. Paste text or open a PDF and set your own pace.",
     statusLabel: "live",
     tags: ["react", "rsvp", "pdf"],
     tone: "frost",
-    href: "/apps/focus-reader/",
+    href: "/playground/focus-reader",
   },
 ];

@@ -1,0 +1,657 @@
+/* ─── Focus Reader ────────────────────────────────────────────────────────
+ *
+ * Two screens sharing the playground's palette: compose (get text in) and
+ * read (one word, held still). The reading screen is deliberately almost
+ * empty. Anything with contrast on it beside the word is somewhere for the
+ * eye to jump, and the whole technique is built on the eye not jumping.
+ */
+
+.fr-root {
+  --fr-line: rgba(133, 182, 255, 0.16);
+  --fr-line-bright: rgba(133, 182, 255, 0.34);
+  --fr-panel: rgba(9, 18, 32, 0.66);
+  --fr-accent: var(--playground-accent);
+  --fr-warm: var(--playground-warm);
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Owns its own scrolling. The page around it is locked (see the page
+     component), because a document scrollbar appearing on a screen with one
+     word on it shifts the pivot column by the scrollbar's own width. */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 5.5rem 1.5rem 2rem;
+}
+
+/* ── Shared controls ──────────────────────────────────────────────────── */
+
+.fr-button {
+  border: 1px solid var(--fr-line);
+  border-radius: 999px;
+  background: rgba(7, 17, 31, 0.6);
+  color: rgba(216, 228, 255, 0.82);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  padding: 0.62rem 1.25rem;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.fr-button:hover:not(:disabled) {
+  border-color: var(--fr-line-bright);
+  color: #eef4ff;
+}
+
+.fr-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.fr-button-primary {
+  margin-top: 1.75rem;
+  padding: 0.85rem 2.6rem;
+  border-color: rgba(102, 167, 255, 0.42);
+  background: linear-gradient(180deg, rgba(102, 167, 255, 0.18), rgba(102, 167, 255, 0.06));
+  color: #eef4ff;
+  font-weight: 500;
+}
+
+.fr-button-primary:hover:not(:disabled) {
+  border-color: rgba(102, 167, 255, 0.75);
+  background: linear-gradient(180deg, rgba(102, 167, 255, 0.28), rgba(102, 167, 255, 0.1));
+}
+
+.fr-root :focus-visible {
+  outline: 2px solid var(--fr-accent);
+  outline-offset: 3px;
+}
+
+/* ── Compose ──────────────────────────────────────────────────────────── */
+
+/* auto margins rather than justify-content: center. A centred flex child
+   that outgrows its scroll container has its overflow clipped off the top
+   with no way to reach it; auto margins centre the same way and collapse
+   instead of clipping. */
+.fr-compose {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(46rem, 100%);
+  margin-block: auto;
+}
+
+.fr-intro {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.fr-kicker {
+  margin: 0 0 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: rgba(201, 221, 255, 0.5);
+}
+
+.fr-title {
+  margin: 0 0 0.85rem;
+  font-family: "Manrope", var(--font-body);
+  font-size: clamp(1.9rem, 4.4vw, 2.9rem);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  color: #eef4ff;
+}
+
+.fr-lede {
+  max-width: 34rem;
+  margin: 0 auto;
+  color: rgba(216, 228, 255, 0.62);
+  font-size: 0.98rem;
+  line-height: 1.62;
+}
+
+.fr-resume {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  width: 100%;
+  margin-bottom: 1rem;
+  padding: 0.85rem 0.9rem 0.85rem 1.15rem;
+  border: 1px solid var(--fr-line);
+  border-radius: 14px;
+  background: var(--fr-panel);
+}
+
+.fr-resume > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.fr-resume-label {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: rgba(201, 221, 255, 0.45);
+}
+
+.fr-resume-snippet {
+  margin: 0;
+  overflow: hidden;
+  color: rgba(216, 228, 255, 0.72);
+  font-size: 0.88rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fr-drop {
+  position: relative;
+  width: 100%;
+  border: 1px solid var(--fr-line);
+  border-radius: 16px;
+  background: var(--fr-panel);
+  transition: border-color 160ms ease;
+}
+
+.fr-drop:focus-within {
+  border-color: var(--fr-line-bright);
+}
+
+.fr-textarea {
+  display: block;
+  width: 100%;
+  min-height: 12.5rem;
+  padding: 1.15rem 1.25rem;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: rgba(230, 238, 255, 0.92);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.68;
+  resize: vertical;
+}
+
+.fr-textarea::placeholder {
+  color: rgba(201, 221, 255, 0.34);
+}
+
+.fr-textarea:focus {
+  outline: none;
+}
+
+/* Shown only mid-drag, so the panel says what a dropped file will do rather
+   than leaving the pointer over an inert box. */
+.fr-drop-veil {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background: rgba(7, 17, 31, 0.88);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: rgba(201, 221, 255, 0.8);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
+.fr-drop.is-dragging {
+  border-color: var(--fr-accent);
+}
+
+.fr-drop.is-dragging .fr-drop-veil {
+  opacity: 1;
+}
+
+/* The native control is a beige "Choose File" button that no amount of CSS
+   reaches. It stays in the DOM for the file dialog and is driven by the
+   styled button next to it. */
+.fr-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fr-compose-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  width: 100%;
+  margin-top: 0.9rem;
+}
+
+.fr-compose-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.fr-meter {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  color: rgba(216, 228, 255, 0.66);
+}
+
+.fr-meter-sep {
+  margin: 0 0.5rem;
+  color: rgba(201, 221, 255, 0.28);
+}
+
+.fr-meter-idle {
+  color: rgba(201, 221, 255, 0.36);
+}
+
+.fr-meter-status {
+  color: var(--fr-accent);
+}
+
+.fr-meter-error {
+  color: #ff9878;
+}
+
+/* ── Read ─────────────────────────────────────────────────────────────── */
+
+.fr-read {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(52rem, 100%);
+  margin-block: auto;
+}
+
+.fr-hud {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.fr-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.34rem 0.75rem;
+  border: 1px solid var(--fr-line);
+  border-radius: 999px;
+  background: rgba(7, 17, 31, 0.5);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.fr-chip-label {
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: rgba(201, 221, 255, 0.42);
+}
+
+.fr-chip-value {
+  color: rgba(230, 238, 255, 0.88);
+  font-variant-numeric: tabular-nums;
+}
+
+.fr-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.4rem;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+/* The pivot column, marked. Two short ticks above and below the fixed
+   letter: enough to tell the eye where to rest before the first word
+   arrives, not enough to read as a box around the word. */
+.fr-word-row {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.fr-tick {
+  width: 2px;
+  height: 0.8rem;
+  border-radius: 1px;
+  background: linear-gradient(var(--fr-accent), transparent);
+  opacity: 0.55;
+}
+
+.fr-tick-bottom {
+  background: linear-gradient(transparent, var(--fr-accent));
+}
+
+/* minmax(0, 1fr) on the flanks, not 1fr: an auto-sized track grows to fit
+   a long prefix, which slides the pivot off centre on exactly the words
+   where holding it still matters most. */
+.fr-word {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: baseline;
+  width: 100%;
+  margin: 0;
+  padding: 1.5rem 0;
+  font-family: var(--font-body);
+  font-size: clamp(2.4rem, 7.2vw, 4.4rem);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  white-space: pre;
+  color: #eef4ff;
+}
+
+.fr-word[data-long] {
+  font-size: clamp(2rem, 5.6vw, 3.4rem);
+}
+
+.fr-word[data-longer] {
+  font-size: clamp(1.5rem, 3.6vw, 2.2rem);
+}
+
+.fr-word-pre {
+  justify-self: end;
+}
+
+.fr-word-post {
+  justify-self: start;
+}
+
+.fr-word-pivot {
+  color: var(--fr-warm);
+}
+
+.fr-context {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  min-height: 4.6rem;
+  max-width: 40rem;
+  overflow: hidden;
+  text-align: center;
+  color: rgba(201, 221, 255, 0.34);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  opacity: 0;
+  transition: opacity 260ms ease;
+}
+
+.fr-context.is-shown {
+  opacity: 1;
+}
+
+.fr-context .is-current {
+  color: rgba(238, 244, 255, 0.92);
+}
+
+.fr-done {
+  margin-top: 0.5rem;
+  padding: 1.1rem 1.5rem;
+  border: 1px solid var(--fr-line);
+  border-radius: 16px;
+  background: var(--fr-panel);
+  text-align: center;
+}
+
+.fr-done-title {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--fr-accent);
+}
+
+.fr-done-stats {
+  margin: 0 0 0.9rem;
+  color: rgba(216, 228, 255, 0.76);
+  font-size: 0.92rem;
+}
+
+.fr-done-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+/* ── Transport ────────────────────────────────────────────────────────── */
+
+.fr-transport {
+  width: 100%;
+  margin-top: 2rem;
+}
+
+.fr-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1.1rem;
+}
+
+.fr-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.fr-icon {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: none;
+  color: rgba(201, 221, 255, 0.6);
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.fr-icon:hover {
+  color: #eef4ff;
+  border-color: var(--fr-line);
+}
+
+.fr-icon-main {
+  width: 3rem;
+  height: 3rem;
+  border-color: rgba(102, 167, 255, 0.35);
+  background: rgba(102, 167, 255, 0.1);
+  color: #eef4ff;
+}
+
+.fr-icon-main:hover {
+  border-color: rgba(102, 167, 255, 0.7);
+  background: rgba(102, 167, 255, 0.18);
+}
+
+.fr-speed {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.fr-speed-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: rgba(201, 221, 255, 0.42);
+}
+
+.fr-speed-value {
+  min-width: 4.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+  color: #eef4ff;
+}
+
+.fr-speed-value i {
+  margin-left: 0.25rem;
+  font-style: normal;
+  font-size: 0.68rem;
+  color: rgba(201, 221, 255, 0.42);
+}
+
+/* Range inputs, drawn rather than inherited. The UA control is a bright
+   blue pill from the OS accent colour, which is the loudest object on a
+   screen whose whole job is to have exactly one lit thing on it. */
+.fr-root input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 1.1rem;
+  margin: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.fr-root input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--fr-accent) var(--fr-fill, 0%),
+    rgba(133, 182, 255, 0.16) var(--fr-fill, 0%)
+  );
+}
+
+.fr-root input[type="range"]::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--fr-accent) var(--fr-fill, 0%),
+    rgba(133, 182, 255, 0.16) var(--fr-fill, 0%)
+  );
+}
+
+.fr-root input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4.5px;
+  border: 0;
+  border-radius: 50%;
+  background: #eef4ff;
+  box-shadow: 0 0 0 4px rgba(102, 167, 255, 0.18);
+}
+
+.fr-root input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 50%;
+  background: #eef4ff;
+  box-shadow: 0 0 0 4px rgba(102, 167, 255, 0.18);
+}
+
+.fr-scrub {
+  width: 100%;
+}
+
+.fr-speed input[type="range"] {
+  width: 9rem;
+}
+
+.fr-keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem 0.9rem;
+  margin: 1.6rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: rgba(201, 221, 255, 0.3);
+}
+
+.fr-keys span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.fr-keys kbd {
+  display: inline-block;
+  min-width: 1.5rem;
+  padding: 0.14rem 0.38rem;
+  margin: 0;
+  border: 1px solid var(--fr-line);
+  border-radius: 4px;
+  background: rgba(7, 17, 31, 0.6);
+  color: rgba(216, 228, 255, 0.62);
+  font-family: inherit;
+  font-size: 0.66rem;
+  text-align: center;
+}
+
+/* The word display is aria-hidden (a live region firing five times a second
+   is unusable), so the text itself is exposed here once, for assistive tech
+   and for select-all. */
+.fr-sr-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── Narrow ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .fr-root {
+    padding-top: 4.75rem;
+  }
+
+  .fr-hud {
+    margin-bottom: 1.5rem;
+  }
+
+  .fr-controls {
+    justify-content: center;
+  }
+
+  .fr-exit {
+    order: 3;
+  }
+
+  .fr-keys {
+    display: none; /* No keyboard to hint at. */
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fr-root *,
+  .fr-root *::before,
+  .fr-root *::after {
+    transition-duration: 0.01ms !important;
+  }
+}

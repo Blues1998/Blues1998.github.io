@@ -1,0 +1,48 @@
+---
+import PlaygroundLayout from "../../layouts/PlaygroundLayout.astro";
+import FocusReader from "../../components/playground/FocusReader";
+import "../../styles/experiment.css";
+import "../../styles/focus-reader.css";
+---
+
+<PlaygroundLayout
+  title="Focus Reader - Playground"
+  description="A speed-reading surface that shows one word at a time, pinned on the letter your eye already lands on. Paste text or open a PDF and set your own pace."
+>
+  <div class="experiment-page">
+    <nav class="experiment-nav">
+      <a href="/playground" class="experiment-nav-back">&larr; playground</a>
+    </nav>
+
+    <div class="fr-root">
+      <FocusReader client:only="react" />
+    </div>
+  </div>
+
+  <noscript>
+    <p class="fr-noscript">
+      Focus Reader shows one word at a time on a timer, so it needs JavaScript
+      to run. Everything else in the <a href="/playground">playground</a> is
+      listed there.
+    </p>
+  </noscript>
+</PlaygroundLayout>
+
+<style>
+  /* The scroll position is the reading position here, not the page, so the
+     document itself must not scroll: a stray scrollbar on a screen with one
+     word on it moves the pivot column by its own width. */
+  .experiment-page {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .fr-noscript {
+    max-width: 32rem;
+    margin: 6rem auto;
+    padding: 0 1.5rem;
+    text-align: center;
+    color: rgba(216, 228, 255, 0.7);
+  }
+</style>
