@@ -1,0 +1,102 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><!-- View Transitions: enables the persistent cosmos backdrop (see
+         HomeCosmos.astro) to survive client-side navigation instead of
+         being torn down and rebuilt on every page. On browsers without the
+         native View Transitions API, "swap" keeps client-side routing
+         (so persistence still works) without the native crossfade; never
+         "none", which would silently disable persistence for those
+         visitors. No-JS visitors are unaffected either way: every link
+         here is still a real <a href>, so navigation just falls back to a
+         normal full page load. --><meta name="astro-view-transitions-fallback" content="swap"><meta name="astro-view-transitions-enabled" content="true"><meta name="astro-view-transitions-fallback" content="animate"><script type="module" src="/astro/ClientRouter.astro_astro_type_script_index_0_lang.DcSP9LZ1.js"></script><!-- Arms the content-arrival animation (see lib/arrive.ts). Inline and
+         in <head> so the hidden state is in force before the first paint;
+         doing it from the module below would show the finished page for a
+         frame and then blank it. Absent this attribute the CSS leaves
+         everything visible, which is what a no-JS or reduced-motion
+         visitor gets. --><script>
+      (function () {
+        var root = document.documentElement;
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        root.setAttribute("data-arrive", "");
+        // Failsafe. The attribute above is what hides the content, and the
+        // module that reveals it again could fail to arrive at all - a
+        // bundle that 404s, an error thrown before it binds. Without this
+        // that leaves every inner page permanently blank, which is a far
+        // worse outcome than an unanimated one.
+        setTimeout(function () {
+          if (!window.__arriveReady) root.removeAttribute("data-arrive");
+        }, 2500);
+      })();
+    </script><title>Music - Animesh Singh</title><meta name="description" content="A small collection of guitar recordings and sessions. Simple, unpolished, intentional."><!-- Canonical --><link rel="canonical" href="https://blues1998.github.io/music/"><!-- Open Graph --><meta property="og:title" content="Music - Animesh Singh"><meta property="og:description" content="A small collection of guitar recordings and sessions. Simple, unpolished, intentional."><meta property="og:type" content="website"><meta property="og:url" content="https://blues1998.github.io/music/"><meta property="og:image" content="https://blues1998.github.io/images/og-default.png"><!-- Dimensions let a scraper reserve the right box before it has
+         fetched the image, which is the difference between a card that
+         renders at full width immediately and one that pops in. --><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="Animesh Singh - software engineer, photographer and musician"><meta property="og:site_name" content="Animesh Singh"><meta property="og:locale" content="en_US"><!-- Twitter --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Music - Animesh Singh"><meta name="twitter:description" content="A small collection of guitar recordings and sessions. Simple, unpolished, intentional."><meta name="twitter:image" content="https://blues1998.github.io/images/og-default.png"><meta name="twitter:image:alt" content="Animesh Singh - software engineer, photographer and musician"><!-- Icons. The SVG is the one browsers that support it should use, so
+         it comes first; the .ico is both the legacy fallback and the file
+         that gets served for the bare /favicon.ico that browsers, crawlers
+         and link unfurlers probe regardless of what these tags say. --><link rel="icon" href="/favicon.ico" sizes="32x32"><link rel="icon" href="/images/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/images/icon-180.png"><link rel="manifest" href="/site.webmanifest"><!-- Paints mobile browser chrome to match the page instead of leaving
+         a white bar above an otherwise fully dark site. --><meta name="theme-color" content="#0f1117"><!-- RSS --><link rel="alternate" type="application/rss+xml" title="Animesh Singh" href="/rss.xml"><!-- Fonts --><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/astro/index.DUGziZze.css">
+<link rel="stylesheet" href="/astro/index.PVcJ1ORV.css"><style>[data-astro-transition-scope="astro-4ol64zz5-1"] { view-transition-name: cosmos-scene; }@layer astro { ::view-transition-old(cosmos-scene) { 
+	animation-duration: 180ms;
+	animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
+	animation-fill-mode: both;
+	animation-name: astroFadeOut; }::view-transition-new(cosmos-scene) { 
+	animation-duration: 180ms;
+	animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
+	animation-fill-mode: both;
+	animation-name: astroFadeIn; }[data-astro-transition=back]::view-transition-old(cosmos-scene) { 
+	animation-duration: 180ms;
+	animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
+	animation-fill-mode: both;
+	animation-name: astroFadeOut; }[data-astro-transition=back]::view-transition-new(cosmos-scene) { 
+	animation-duration: 180ms;
+	animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
+	animation-fill-mode: both;
+	animation-name: astroFadeIn; } }[data-astro-transition-fallback="old"] [data-astro-transition-scope="astro-4ol64zz5-1"],
+			[data-astro-transition-fallback="old"][data-astro-transition-scope="astro-4ol64zz5-1"] { 
+	animation-duration: 180ms;
+	animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
+	animation-fill-mode: both;
+	animation-name: astroFadeOut; }[data-astro-transition-fallback="new"] [data-astro-transition-scope="astro-4ol64zz5-1"],
+			[data-astro-transition-fallback="new"][data-astro-transition-scope="astro-4ol64zz5-1"] { 
+	animation-duration: 180ms;
+	animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
+	animation-fill-mode: both;
+	animation-name: astroFadeIn; }[data-astro-transition=back][data-astro-transition-fallback="old"] [data-astro-transition-scope="astro-4ol64zz5-1"],
+			[data-astro-transition=back][data-astro-transition-fallback="old"][data-astro-transition-scope="astro-4ol64zz5-1"] { 
+	animation-duration: 180ms;
+	animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
+	animation-fill-mode: both;
+	animation-name: astroFadeOut; }[data-astro-transition=back][data-astro-transition-fallback="new"] [data-astro-transition-scope="astro-4ol64zz5-1"],
+			[data-astro-transition=back][data-astro-transition-fallback="new"][data-astro-transition-scope="astro-4ol64zz5-1"] { 
+	animation-duration: 180ms;
+	animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
+	animation-fill-mode: both;
+	animation-name: astroFadeIn; }</style></head> <body>  <a href="#main" class="skip-link">Skip to content</a> <div class="home-cosmos" id="home-cosmos" aria-hidden="true" data-cosmos-mode="hero" data-astro-transition-persist="cosmos-scene" data-astro-cid-uuir2toa data-astro-transition-scope="astro-4ol64zz5-1"> <canvas id="home-cosmos-canvas" data-astro-cid-uuir2toa></canvas> <div class="cosmos-scrim" data-astro-cid-uuir2toa></div> <div class="cosmos-glare-mask" data-astro-cid-uuir2toa><div class="cosmos-glare" id="cosmos-glare" data-astro-cid-uuir2toa></div></div> </div>  <script type="module" src="/astro/HomeCosmos.astro_astro_type_script_index_0_lang.7dDWCc91.js"></script> <nav class="site-nav" aria-label="Primary"> <div class="nav-container"> <div class="nav-identity"> <a href="/" class="nav-brand">Animesh Singh</a>  <p class="hud-label nav-tagline">Explore. Experiment. Play.</p> </div> <div class="nav-right"> <ul class="nav-links"> <li> <a href="/playground/" data-astro-reload="true">  <span class="nav-index" aria-hidden="true">01</span> <span class="nav-label">Playground</span> </a> </li><li> <a href="/projects/">  <span class="nav-index" aria-hidden="true">02</span> <span class="nav-label">Projects</span> </a> </li><li> <a href="/photography/">  <span class="nav-index" aria-hidden="true">03</span> <span class="nav-label">Photography</span> </a> </li><li> <a href="/music/" aria-current="page">  <span class="nav-index" aria-hidden="true">04</span> <span class="nav-label">Music</span> </a> </li><li> <a href="/about/">  <span class="nav-index" aria-hidden="true">05</span> <span class="nav-label">About</span> </a> </li><li> <a href="/contact/">  <span class="nav-index" aria-hidden="true">06</span> <span class="nav-label">Contact</span> </a> </li> </ul> </div> </div> </nav>  <main id="main" tabindex="-1" data-arrive>  <section> <p class="page-kicker"><span class="page-kicker-index">04</span> / 06</p> <h1>Music</h1> <p>
+Guitar recordings and small sessions. Audio first. No autoplay.
+</p> </section>  <section> <h2>Audio</h2> <div class="music-list"> <article class="music-item"> <div class="music-meta"> <div class="music-title">Midnight Practice</div> <div class="music-note"> 2:34 · Fingerstyle improvisation, recorded late at night. </div> </div> <audio controls preload="none"> <source src="/audio/track-01.mp3" type="audio/mpeg">
+Your browser does not support the audio element.
+</audio> </article><article class="music-item"> <div class="music-meta"> <div class="music-title">Morning Riff</div> <div class="music-note"> 1:58 · Warm-up session, minimal processing. </div> </div> <audio controls preload="none"> <source src="/audio/track-02.mp3" type="audio/mpeg">
+Your browser does not support the audio element.
+</audio> </article><article class="music-item"> <div class="music-meta"> <div class="music-title">Unfinished Idea</div> <div class="music-note"> 3:12 · Exploring melody over rhythm. </div> </div> <audio controls preload="none"> <source src="/audio/track-03.mp3" type="audio/mpeg">
+Your browser does not support the audio element.
+</audio> </article> </div> </section>  <section> <h2>Video</h2> <div class="music-list"> <article class="music-item"> <div class="music-meta"> <div class="music-title">Studio Session</div> <div class="music-note">Short live take. One camera, no edits.</div> </div> <video controls preload="none"> <source src="/video/session-01.mp4" type="video/mp4">
+Your browser does not support the video element.
+</video> </article> </div> </section>  </main> <footer>  <div class="footer-container"> <p class="footer-copy">
+&copy; 2026 Animesh Singh
+</p> <ul class="footer-links"> <li><a href="mailto:animesh98388@gmail.com">Email</a></li> <li><a href="https://github.com/Blues1998" target="_blank" rel="noopener noreferrer">GitHub</a></li> <li><a href="https://www.linkedin.com/in/animesh-singh-profile/" target="_blank" rel="noopener noreferrer">LinkedIn</a></li> </ul> </div> <p class="footer-credits">
+Sun &amp; planet textures: <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener noreferrer">Solar System Scope</a> (CC BY 4.0). Pluto map: <a href="https://astrogeology.usgs.gov/search/map/pluto_new_horizons_lorri_mvic_global_mosaic_300m" target="_blank" rel="noopener noreferrer">USGS</a>/NASA New Horizons. Nebula photography, Voyager and Itokawa models: NASA (Itokawa shape model with JAXA).
+</p> </footer> <script type="module" src="/astro/BaseLayout.astro_astro_type_script_index_0_lang.CphJKDLB.js"></script> <!-- Hidden terminal trigger. Guarded: with <ClientRouter /> active,
+         this inline script re-executes on every client-side navigation
+         (only transition:persist elements are exempt), so without the
+         guard each navigation would stack another listener on the
+         never-swapped document, firing the handler once per accumulated
+         listener on a single "~" press. --> <script>
+      if (!window.__terminalShortcutBound) {
+        window.__terminalShortcutBound = true;
+        document.addEventListener("keydown", function(e) {
+          if (e.key === "~" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            var tag = (e.target.tagName || "").toLowerCase();
+            if (tag !== "input" && tag !== "textarea" && !e.target.isContentEditable) {
+              window.location.href = "/terminal/";
+            }
+          }
+        });
+      }
+    </script> </body> </html>

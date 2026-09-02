@@ -1,0 +1,13 @@
+# https://blues1998.github.io
+#
+# Everything here is meant to be found. The one page that should not be
+# indexed - the terminal easter egg - says so with a robots meta tag on
+# the page itself rather than a Disallow line here, deliberately:
+# Disallow stops a crawler fetching the page, which stops it ever seeing
+# the noindex, which is how a "hidden" page ends up listed anyway with
+# "No information is available for this page" under it.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://blues1998.github.io/sitemap-index.xml
