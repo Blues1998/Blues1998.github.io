@@ -185,7 +185,7 @@ export function mountWander(container: HTMLElement): () => void {
     last = now;
     wallT += dt;
 
-    carObj.update(dt, env, weather.wx, wallT, input.throttle(), input.steer(), input.braking());
+    carObj.update(dt, env, weather.wx, wallT, input.throttle(), input.steer(), input.braking(), input.handbrake());
     roadMesh.ensure(carObj.car.s);
     chunks.update(carObj.car.x, carObj.car.z, 5);
     grass.processJobs(2.5);

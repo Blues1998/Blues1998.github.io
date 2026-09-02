@@ -37,6 +37,11 @@ export interface CarState {
   pitchV: number;
   rollV: number;
   velDir: number; // direction of travel, lags heading when grip is low
+  yawRate: number; // angular yaw velocity (rad/s)
+  slipAngle: number; // chassis sideslip angle relative to travel direction (degrees)
+  slipVel: number; // lateral sliding velocity (m/s) for tire screech audio and smoke VFX
+  isDrifting: boolean; // whether car is currently in controlled oversteer
+  handbrake: boolean; // whether handbrake / E-brake is engaged
 }
 
 /* Derived each frame from the sun position; read by audio, weather and the

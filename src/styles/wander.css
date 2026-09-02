@@ -79,6 +79,22 @@
   color: var(--wander-dim);
 }
 
+.wander-drift-chip {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  background: rgba(255, 80, 30, 0.28);
+  border: 1px solid rgba(255, 110, 50, 0.85);
+  color: #ffaa77;
+  text-shadow: 0 0 10px rgba(255, 80, 30, 0.7);
+  box-shadow: 0 0 14px rgba(255, 80, 30, 0.35);
+  transition: opacity 0.15s ease;
+}
+
 .wander-chips {
   position: fixed;
   right: 22px;

@@ -47,7 +47,9 @@ export function createInput(actions: InputActions) {
   return {
     throttle: () => (keys.has("w") || keys.has("arrowup") ? 1 : 0) - (keys.has("s") || keys.has("arrowdown") ? 1 : 0),
     steer: () => (keys.has("a") || keys.has("arrowleft") ? 1 : 0) - (keys.has("d") || keys.has("arrowright") ? 1 : 0),
-    braking: () => keys.has(" "),
+    braking: () => keys.has(" ") || keys.has("shift"),
+    handbrake: () => keys.has(" ") || keys.has("shift"),
+    footbrake: () => keys.has("s") || keys.has("arrowdown"),
     dispose() {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);

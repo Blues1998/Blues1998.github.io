@@ -132,7 +132,8 @@ export function createUI(
     seasonChipEl = q<HTMLDivElement>(".wander-season-chip"),
     clockChipEl = q<HTMLDivElement>(".wander-clock-chip"),
     wxChipEl = q<HTMLDivElement>(".wander-wx-chip"),
-    biomeChipEl = q<HTMLDivElement>(".wander-biome-chip");
+    biomeChipEl = q<HTMLDivElement>(".wander-biome-chip"),
+    driftChipEl = q<HTMLDivElement>(".wander-drift-chip");
 
   /* HUD text is rewritten at ~8 Hz, not per frame: a speed readout that
      changes 144 times a second is unreadable, and each write is layout. */
@@ -141,6 +142,16 @@ export function createUI(
     if (t < hudNext) return;
     hudNext = t + 0.12;
     speedEl.textContent = String(Math.round(Math.abs(car.speed) * 3.6));
+
+    if (driftChipEl) {
+      if (car.isDrifting) {
+        driftChipEl.style.display = "inline-block";
+        driftChipEl.textContent = `DRIFT ${Math.round(Math.abs(car.slipAngle || 0))}°`;
+      } else {
+        driftChipEl.style.display = "none";
+      }
+    }
+
     /* the dominant biome, not a blend: this is a label, and "62% Badlands"
        is not a thing anyone wants to read at 200 km/h */
     const bn = getBiomeName();

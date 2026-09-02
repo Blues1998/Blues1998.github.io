@@ -36,6 +36,9 @@ export function createAudio(
     exhGain: GainNode | null = null;
   let windGain: GainNode | null = null,
     rainGain: GainNode | null = null;
+  let tireGain: GainNode | null = null,
+    tireFil: BiquadFilterNode | null = null,
+    tireFil2: BiquadFilterNode | null = null;
   let engShiftT = 0,
     engGearPrev = 0,
     birdNext = 0,
@@ -141,6 +144,30 @@ export function createAudio(
     exhFil.connect(exhGain);
     exhGain.connect(cabinFilter);
     exhSrc.start();
+
+    const tireSrc = AC.createBufferSource();
+    tireSrc.buffer = buf;
+    tireSrc.loop = true;
+    tireSrc.playbackRate.value = 1.15;
+    tireFil = AC.createBiquadFilter();
+    tireFil.type = "bandpass";
+    tireFil.frequency.value = 1650;
+    tireFil.Q.value = 2.8;
+
+    tireFil2 = AC.createBiquadFilter();
+    tireFil2.type = "peaking";
+    tireFil2.frequency.value = 2850;
+    tireFil2.Q.value = 4.0;
+    tireFil2.gain.value = 12.0;
+
+    tireGain = AC.createGain();
+    tireGain.gain.value = 0;
+
+    tireSrc.connect(tireFil);
+    tireFil.connect(tireFil2);
+    tireFil2.connect(tireGain);
+    tireGain.connect(cabinFilter);
+    tireSrc.start();
   }
 
   /* A short burst of pitch-bent sines, panned randomly. Not a recording of a
@@ -290,6 +317,17 @@ export function createAudio(
     const rainMul = inCockpit ? 0.4 : 1.0;
     windGain.gain.setTargetAtTime((Math.pow(sp / MAX_SPEED, 2) * 0.42 + wx.rain * 0.02) * windMul, t, 0.2);
     rainGain.gain.setTargetAtTime(wx.rain * (wx.snowMode ? 0.015 : 0.2) * rainMul, t, 0.4);
+
+    /* Procedural tire screech: scales with lateral tire slip velocity */
+    if (tireGain && tireFil) {
+      const slipVel = car.slipVel || 0;
+      // On tarmac, tire screams; on grass or deep snow, squeal is softened
+      const surfaceTireFactor = (1.0 - (car.off || 0) * 0.75) * (1.0 - (wx.snowMode ? 0.7 : 0));
+      const squealIntensity = clamp((slipVel - 1.2) / 6.5, 0, 1) * surfaceTireFactor;
+      const targetTireVol = squealIntensity * (inCockpit ? 0.16 : 0.26);
+      tireGain.gain.setTargetAtTime(targetTireVol, t, 0.05);
+      tireFil.frequency.setTargetAtTime(1400 + squealIntensity * 900 + sp * 8, t, 0.05);
+    }
     /* birds in spring and summer daylight only */
     const si = Math.floor(state.phase) % 4;
     if ((si === 0 || si === 1) && env.daylight > 0.55 && state.simT > birdNext) {

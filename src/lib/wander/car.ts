@@ -35,6 +35,11 @@ export function createCar(road: Road, terrain: Terrain, U: Uniforms, state: Wand
     pitchV: 0,
     rollV: 0,
     velDir: 0,
+    yawRate: 0,
+    slipAngle: 0,
+    slipVel: 0,
+    isDrifting: false,
+    handbrake: false,
   };
 
   const group = new THREE.Group();
@@ -329,7 +334,16 @@ export function createCar(road: Road, terrain: Terrain, U: Uniforms, state: Wand
     return p;
   }
 
-  function update(dt: number, env: EnvState, wx: WeatherState, wallT: number, throttleIn: number, steerIn: number, braking: boolean) {
+  function update(
+    dt: number,
+    env: EnvState,
+    wx: WeatherState,
+    wallT: number,
+    throttleIn: number,
+    steerIn: number,
+    braking: boolean,
+    handbrakeIn?: boolean
+  ) {
     road.extendTo(car.s + 2400);
     const q = road.query(car.x, car.z);
     if (q) {
@@ -345,6 +359,7 @@ export function createCar(road: Road, terrain: Terrain, U: Uniforms, state: Wand
 
     let th = throttleIn;
     let stIn = steerIn;
+    let effSteer = 0;
 
     /* Autopilot: pure pursuit toward a point on the spline that recedes with
        speed, offset to the right so it tracks a lane rather than the centre
@@ -366,39 +381,119 @@ export function createCar(road: Road, terrain: Terrain, U: Uniforms, state: Wand
       th = clamp((vT - car.speed) * 0.4, -1, 1);
     }
 
-    car.steer += (stIn * 0.55 - car.steer) * Math.min(1, dt * 6);
-    /* steering authority falls off with speed, so the car is twitchy in a car
-       park and stable at 200 km/h without a separate speed-sensitive rack */
-    const effSteer = car.steer / (1 + Math.abs(car.speed) * 0.045);
-    const yawMax = 1.25 * (0.55 + 0.45 * grip);
-    const yawRate = clamp((effSteer * car.speed) / 2.8, -yawMax, yawMax);
-    car.heading += yawRate * dt;
+    /* ---------------- PACEJKA 2-DOF DRIFT & VEHICLE DYNAMICS ---------------- */
+    const isHandbrake = !!handbrakeIn || (braking && Math.abs(car.speed) > 3.8);
+    car.handbrake = isHandbrake;
 
+    // Steering input filtering with counter-steer authority boost
+    car.steer += (stIn * 0.65 - car.steer) * Math.min(1, dt * 7.5);
+
+    // If car is sliding, allow extra steering lock for catching and holding drifts
+    if (car.velDir === 0) car.velDir = car.heading;
+    const currentSideslip = wrapAngle(car.velDir - car.heading);
+    const counterSteerBonus = Math.min(1.0, Math.abs(currentSideslip) * 1.8);
+    const rackReduction = 1 + Math.max(0, Math.abs(car.speed) - 8) * 0.022 * (1.0 - counterSteerBonus * 0.65);
+    effSteer = car.steer / rackReduction;
+
+    // Forward and lateral velocities in car frame
+    const speedMag = Math.max(Math.abs(car.speed), 1.8);
+    const vLat = car.speed * Math.sin(currentSideslip);
+
+    // Front and rear wheel geometry (wheelbase 2.7m)
+    const Lf = 1.35;
+    const Lr = 1.35;
+
+    // Tire slip angles (alpha_f and alpha_r in radians)
+    const alphaF = Math.atan2(vLat + Lf * car.yawRate, speedMag) - effSteer * 0.85;
+    const alphaR = Math.atan2(vLat - Lr * car.yawRate, speedMag);
+
+    // Normalized Pacejka "Magic Formula" lateral friction
+    function pacejkaForce(alpha: number, maxGrip: number) {
+      const B = 8.5,
+        C = 1.32,
+        D = 1.0,
+        E = 0.94;
+      const f = D * Math.sin(C * Math.atan(B * alpha - E * (B * alpha - Math.atan(B * alpha))));
+      return -f * maxGrip * 9.81;
+    }
+
+    // Axle grip capacities
+    let frontGrip = grip;
+    let rearGrip = grip;
+
+    // Handbrake: locks rear longitudinal traction and drops rear lateral grip by 65%
+    if (isHandbrake) {
+      rearGrip *= 0.35;
+    }
+
+    // Throttle oversteer (power-slide): hard acceleration on RWD breaks rear lateral grip
+    if (th > 0.4 && Math.abs(car.speed) > 6) {
+      const powerBreak = clamp((th - 0.4) * 1.2, 0, 0.55);
+      rearGrip *= 1.0 - powerBreak;
+    }
+
+    // Calculate lateral tire forces
+    const FyF = pacejkaForce(alphaF, frontGrip);
+    const FyR = pacejkaForce(alphaR, rearGrip);
+
+    // Dynamic yaw torque and angular acceleration
+    const yawTorque = FyF * Lf - FyR * Lr;
+    const yawInertia = 4.2;
+    let yawAcc = yawTorque / yawInertia;
+
+    // Aerodynamic and mechanical yaw damping
+    yawAcc -= car.yawRate * (2.4 + Math.abs(car.speed) * 0.035);
+
+    // Integrate yaw velocity and heading
+    car.yawRate += yawAcc * dt;
+    car.yawRate = clamp(car.yawRate, -3.2, 3.2);
+    car.heading += car.yawRate * dt;
+    car.heading = wrapAngle(car.heading);
+
+    // Longitudinal acceleration
     let a = 0;
     if (th > 0) {
-      /* quadratic falloff toward MAX_SPEED stands in for aero drag */
       const sf = Math.max(car.speed, 0) / MAX_SPEED;
-      // On grass/dirt, wheelspin limits forward traction
       const tractionFactor = 1.0 - off * 0.4;
-      a += 12 * th * (1 - sf * sf) * (0.8 + 0.2 * grip) * tractionFactor;
-    } else if (th < 0) a += car.speed > 0.5 ? -15 * grip : -6.5 * (1 + car.speed / MAX_REV);
-    
+      a += 12.5 * th * (1 - sf * sf) * (0.8 + 0.2 * grip) * tractionFactor;
+    } else if (th < 0) {
+      a += car.speed > 0.5 ? -15 * grip : -6.5 * (1 + car.speed / MAX_REV);
+    }
+
     // Aerodynamic drag
-    a -= car.speed * 0.11;
-    
-    // Realistic grass rolling resistance: maintains speed and momentum naturally
-    // (At 100 km/h ~28 m/s, deceleration is ~1.6 m/s^2 instead of an abrupt 15 m/s^2 clamp)
+    a -= car.speed * 0.1;
     const offRoadDrag = off * (0.65 + Math.abs(car.speed) * 0.035) * Math.sign(car.speed || 0);
     a -= offRoadDrag;
 
-    if (braking) a -= Math.sign(car.speed) * 18 * grip * Math.min(1, Math.abs(car.speed));
-    car.speed = clamp(car.speed + a * dt, -MAX_REV, MAX_SPEED);
-    if (Math.abs(car.speed) < 0.02 && th === 0) car.speed = 0;
+    // Handbrake drag vs standard braking
+    if (isHandbrake) {
+      // Handbrake slows car while letting rear wheels slide
+      a -= Math.sign(car.speed) * 9.5 * grip;
+    } else if (braking) {
+      // Standard 4-wheel footbrake
+      a -= Math.sign(car.speed) * 18 * grip * Math.min(1, Math.abs(car.speed));
+    }
 
-    /* direction of travel lags the heading when grip is low -> gentle slides */
-    if (car.velDir === 0) car.velDir = car.heading;
-    const follow = grip * (2.2 + Math.abs(car.speed) * 0.24);
-    car.velDir += wrapAngle(car.heading - car.velDir) * Math.min(1, dt * follow);
+    car.speed = clamp(car.speed + a * dt, -MAX_REV, MAX_SPEED);
+    if (Math.abs(car.speed) < 0.02 && th === 0 && !isHandbrake) car.speed = 0;
+
+    // Dynamic sideslip and velocity direction update
+    const totalLatForce = FyF + FyR;
+    const latAcc = totalLatForce / 12.0;
+
+    // Smooth velocity heading convergence driven by tire grip
+    const gripConvergence = (grip * 4.2 + Math.abs(car.speed) * 0.15) * (isHandbrake ? 0.4 : 1.0);
+    const headingDiff = wrapAngle(car.heading - car.velDir);
+    car.velDir += headingDiff * Math.min(1, dt * gripConvergence) + latAcc * dt * 0.06;
+    car.velDir = wrapAngle(car.velDir);
+
+    // Compute metrics for HUD, audio, and visual VFX
+    const sideslipRad = wrapAngle(car.velDir - car.heading);
+    car.slipAngle = (sideslipRad * 180) / Math.PI;
+    car.slipVel = Math.abs(car.speed) * Math.sin(Math.abs(sideslipRad)) + Math.abs(alphaR) * 6.0;
+    car.isDrifting = Math.abs(car.slipAngle) > 9.0 && Math.abs(car.speed) > 6.0;
+
+    // Advance position along velocity vector
     const mvx = Math.sin(car.velDir),
       mvz = Math.cos(car.velDir);
     car.x += mvx * car.speed * dt;

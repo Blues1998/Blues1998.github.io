@@ -33,6 +33,7 @@ export default function EndlessDrive() {
         <div className="wander-speed">0</div>
         <div className="wander-speed-unit">KM/H</div>
         <div className="wander-auto-chip">AUTO-DRIVE</div>
+        <div className="wander-drift-chip" style={{ display: "none" }}>DRIFT 0°</div>
       </div>
 
       <div className="wander-chips">
@@ -44,7 +45,7 @@ export default function EndlessDrive() {
       </div>
 
       <div className="wander-help">
-        <b>W/S</b> drive · <b>A/D</b> steer · <b>Space</b> brake · <b>T</b> auto-drive · <b>C</b> camera · <b>V</b> wipers · <b>R</b> reset · <b>M</b> sound · <b>Esc</b> settings
+        <b>W/S</b> drive/rev · <b>A/D</b> steer · <b>Space/Shift</b> handbrake · <b>T</b> auto-drive · <b>C</b> camera · <b>V</b> wipers · <b>R</b> reset · <b>M</b> sound · <b>Esc</b> settings
       </div>
 
       <div className="wander-panel wander-hidden">
