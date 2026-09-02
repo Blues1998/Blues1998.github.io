@@ -339,8 +339,9 @@ export function createCar(road: Road, terrain: Terrain, U: Uniforms, state: Wand
     const off = q ? smoothstep(ROAD_HALF + 0.5, ROAD_HALF + 5, q.d) : 1;
     car.off = off;
 
-    /* surface grip: rain and snow cover both loosen the car */
-    const grip = 1 - clamp(U.uWet.value * 0.38 + env.snow * 0.3, 0, 0.52);
+    /* surface grip: rain, snow, and grass/dirt loosen the car */
+    const baseGrip = 1 - clamp(U.uWet.value * 0.38 + env.snow * 0.3, 0, 0.52);
+    const grip = baseGrip * (1.0 - off * 0.42);
 
     let th = throttleIn;
     let stIn = steerIn;
@@ -377,10 +378,19 @@ export function createCar(road: Road, terrain: Terrain, U: Uniforms, state: Wand
     if (th > 0) {
       /* quadratic falloff toward MAX_SPEED stands in for aero drag */
       const sf = Math.max(car.speed, 0) / MAX_SPEED;
-      a += 12 * th * (1 - sf * sf) * (0.8 + 0.2 * grip);
+      // On grass/dirt, wheelspin limits forward traction
+      const tractionFactor = 1.0 - off * 0.4;
+      a += 12 * th * (1 - sf * sf) * (0.8 + 0.2 * grip) * tractionFactor;
     } else if (th < 0) a += car.speed > 0.5 ? -15 * grip : -6.5 * (1 + car.speed / MAX_REV);
+    
+    // Aerodynamic drag
     a -= car.speed * 0.11;
-    a -= off * (2.5 + Math.abs(car.speed) * 0.45) * Math.sign(car.speed || 0);
+    
+    // Realistic grass rolling resistance: maintains speed and momentum naturally
+    // (At 100 km/h ~28 m/s, deceleration is ~1.6 m/s^2 instead of an abrupt 15 m/s^2 clamp)
+    const offRoadDrag = off * (0.65 + Math.abs(car.speed) * 0.035) * Math.sign(car.speed || 0);
+    a -= offRoadDrag;
+
     if (braking) a -= Math.sign(car.speed) * 18 * grip * Math.min(1, Math.abs(car.speed));
     car.speed = clamp(car.speed + a * dt, -MAX_REV, MAX_SPEED);
     if (Math.abs(car.speed) < 0.02 && th === 0) car.speed = 0;
@@ -397,12 +407,7 @@ export function createCar(road: Road, terrain: Terrain, U: Uniforms, state: Wand
     const fx = Math.sin(car.heading),
       fz = Math.cos(car.heading);
 
-    /* Ride height from the four wheel contact patches, body stays planted.
-       driveHeight, not sampleGround: the ground under the carriageway is the
-       bed the tarmac is laid into and sits ROADBED_DROP below the surface the
-       wheels are on. It also carries the tarmac's own 6 mm-scale offset, and
-       tapers across the road edge, so a wheel half off the shoulder no longer
-       steps between two surfaces the way a boolean on-road test made it. */
+    /* Ride height from the four wheel contact patches, body stays planted. */
     const gFL = terrain.driveHeight(car.x + fx * 1.45 - fz * 0.86, car.z + fz * 1.45 + fx * 0.86);
     const gFR = terrain.driveHeight(car.x + fx * 1.45 + fz * 0.86, car.z + fz * 1.45 - fx * 0.86);
     const gRL = terrain.driveHeight(car.x - fx * 1.45 - fz * 0.86, car.z - fz * 1.45 + fx * 0.86);
@@ -412,7 +417,8 @@ export function createCar(road: Road, terrain: Terrain, U: Uniforms, state: Wand
     let targetY = (gFL + gFR + gRL + gRR) * 0.25;
     const tPitch = Math.atan2(gR2 - gF2, 2.9);
     const tRoll = Math.atan2((gFR + gRR) * 0.5 - (gFL + gRL) * 0.5, 1.72);
-    targetY += (Math.random() - 0.5) * off * Math.min(Math.abs(car.speed) / 18, 1) * 0.02;
+    // Smooth off-road surface rumble
+    targetY += off * Math.sin(wallT * 24.0) * Math.min(Math.abs(car.speed) / 16, 1) * 0.02;
 
     /* near-critically-damped springs: composed over crests, no float */
     car.yv += ((targetY - car.y) * 70 - car.yv * 12.5) * dt;

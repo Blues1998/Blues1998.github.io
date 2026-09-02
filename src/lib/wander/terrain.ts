@@ -36,25 +36,19 @@ export function createTerrain(road: Road, heightField: HeightField, U: Uniforms)
 
   /* The tarmac is laid into a shallow bed rather than onto the surface, so the
      ground is unambiguously below it everywhere on the carriageway and the two
-     meshes cannot interpenetrate. Full depth under the paved width, back to
-     the blended surface by 6 m beyond it - a 4 degree ramp, read as the road
-     sitting in the land rather than on it. See ROADBED_DROP. */
-  const bedDrop = (d: number) => ROADBED_DROP * (1 - smoothstep(ROAD_HALF, ROAD_HALF + 6, d));
+     meshes cannot interpenetrate. Our solid 3D road skirts penetrate 70 cm into
+     the ground, sealing the roadbed into the terrain with zero gaps. */
+  const bedDrop = (d: number) => ROADBED_DROP * (1 - smoothstep(ROAD_HALF - 0.5, ROAD_HALF + 4.0, d));
 
   /* Blend from the road surface out to open terrain. Passing an already
      computed RoadQuery avoids a second spatial-hash lookup in the hot paths
      that have one to hand.
-
-     This is a genuine cut-and-fill rather than a reconciliation of two
-     unrelated surfaces: the road already sits at the local average of this
-     same landscape, so what is left to blend is the difference between the
-     smoothed alignment and the real ground, which is metres rather than
-     hundreds of metres.
-
-     Where the route runs back beside itself the height comes from both
-     branches at once. Taking the nearest alone made the ground step from one
-     branch's elevation to the other's across the line halfway between them -
-     a vertical wall up to 150 m tall, running alongside the road. */
+     
+     Where the route runs back beside itself, the ground between the two branches
+     is shaped as a smooth, continuous ramp joining their elevations.
+     CRITICAL: The active road carriageway itself (d <= ROAD_HALF + 1.8) is 100%
+     authoritative and protected so secondary branches can never drag the ground
+     down into holes or craters under the road. */
   const sampleGround: SampleGround = (x, z, rq) => {
     let q: RoadQuery | null;
     if (rq === undefined) q = road.query(x, z);
@@ -63,13 +57,27 @@ export function createTerrain(road: Road, heightField: HeightField, U: Uniforms)
     const d = q.d;
     const base = baseHeight(x, z, d);
     if (d >= ROAD_BLEND_DIST) return base;
+
     let roadY = q.y;
+    // Multi-branch handling: only blend between branches OUTSIDE the road carriageway!
+    const CLEARANCE = ROAD_HALF + 1.8;
     if (q.alt && q.alt.d < ROAD_BLEND_DIST) {
-      const w0 = branchWeight(d),
-        w1 = branchWeight(q.alt.d);
-      const ws = w0 + w1;
-      if (ws > 0) roadY = (q.y * w0 + q.alt.y * w1) / ws;
+      if (d <= CLEARANCE) {
+        // Firmly on the active road: 100% locked to current branch
+        roadY = q.y;
+      } else if (q.alt.d <= CLEARANCE) {
+        // Firmly on the alternate road
+        roadY = q.alt.y;
+      } else {
+        // In the terrain between the two branches: create a smooth monotonic ramp
+        const d0 = d - CLEARANCE;
+        const d1 = q.alt.d - CLEARANCE;
+        const u = clamp(d0 / (d0 + d1), 0, 1);
+        const ramp = smoothstep(0, 1, u);
+        roadY = lerp(q.y, q.alt.y, ramp);
+      }
     }
+
     const t = smoothstep(ROAD_HALF + 0.8, ROAD_BLEND_DIST - 6, d);
     return lerp(roadY, base, t) - bedDrop(d);
   };
@@ -83,8 +91,8 @@ export function createTerrain(road: Road, heightField: HeightField, U: Uniforms)
     if (rq === undefined) q = road.query(x, z);
     else q = rq;
     const g = sampleGround(x, z, q);
-    if (!q || q.d >= ROAD_HALF + 6) return g;
-    return g + bedDrop(q.d) + 0.06 * (1 - smoothstep(ROAD_HALF - 0.5, ROAD_HALF + 1.5, q.d));
+    if (!q || q.d >= ROAD_HALF + 4.0) return g;
+    return g + bedDrop(q.d) + 0.05 * (1 - smoothstep(ROAD_HALF - 0.5, ROAD_HALF + 1.0, q.d));
   };
 
   /* Splat done from slope alone: grass on the flats, rock as the gradient
@@ -109,6 +117,9 @@ export function createTerrain(road: Road, heightField: HeightField, U: Uniforms)
       `
     varying vec3 vN, vP; varying float vRoad; varying vec2 vClim;
     void main(){
+      // Cut out terrain on the road carriageway so terrain triangles can NEVER puncture
+      // or break up the road into steps on hills and gradients
+      if (vRoad < 5.25) discard;
       BiomeMix bm = mixBiomes(vClim);
       vec3 n = normalize(vN);
       float slope = 1.0 - n.y;

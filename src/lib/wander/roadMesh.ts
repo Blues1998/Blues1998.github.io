@@ -18,6 +18,7 @@ export function createRoadMesh(road: Road, U: Uniforms, state: WanderState, scen
   const material = new THREE.ShaderMaterial({
     uniforms: U as unknown as Record<string, THREE.IUniform>,
     fog: false,
+    side: THREE.DoubleSide,
     vertexShader: `
     varying vec2 vUv; varying vec3 vN, vP;
     void main(){
@@ -33,20 +34,37 @@ export function createRoadMesh(road: Road, U: Uniforms, state: WanderState, scen
       vec3 alb = vec3(0.082, 0.085, 0.092);
       float n = vnoise(vec2(u * 42.0, vUv.y * 2.1));
       alb *= 0.88 + 0.24 * n;
+      // Traveled wheel tracks are polished and slightly darker
       alb *= 1.0 - 0.16 * exp(-pow((abs(u) - 0.45) * 5.5, 2.0));
       float edge = 1.0 - smoothstep(0.018, 0.034, abs(abs(u) - 0.86));
       float dash = (1.0 - smoothstep(0.014, 0.03, abs(u))) * step(fract(vUv.y * 0.125), 0.5);
       float wear = 0.55 + 0.45 * vnoise(vec2(vUv.y * 0.9, u * 3.0));
-      alb = mix(alb, vec3(0.8, 0.8, 0.78), max(edge, dash) * 0.85 * wear);
+      // Lane markings (only on the road deck, not on the side skirts)
+      float onDeck = 1.0 - step(1.0, abs(u));
+      alb = mix(alb, vec3(0.8, 0.8, 0.78), max(edge, dash) * 0.85 * wear * onDeck);
       alb *= 1.0 - uWet * 0.4;
-      float sn = uSnow * (smoothstep(0.5, 0.95, abs(u)) * 0.9 + 0.25 * vnoise(vec2(vUv.y * 0.5, u * 4.0)));
-      alb = mix(alb, vec3(0.9, 0.92, 0.95), clamp(sn, 0.0, 1.0));
+
+      // Dark aggregate foundation for side skirts extending into the terrain bed
+      float skirtM = smoothstep(1.0, 1.08, abs(u));
+      alb = mix(alb, vec3(0.055, 0.058, 0.062), skirtM);
+
+      // Winter highway: plowed, salted dark asphalt travel lanes with wet reflections;
+      // packed snowbanks concentrated along shoulders and verges for clear visual separation
+      if (uSnow > 0.01) {
+        float shoulderSnow = smoothstep(0.78, 1.0, abs(u)) * 0.95;
+        float centerSlush = (1.0 - smoothstep(0.02, 0.18, abs(u))) * 0.22 * vnoise(vec2(vUv.y * 0.8, 0.0));
+        float snowFactor = uSnow * clamp(shoulderSnow + centerSlush, 0.0, 1.0);
+        vec3 plowedAsphalt = alb * vec3(0.82, 0.85, 0.90);
+        alb = mix(plowedAsphalt, vec3(0.92, 0.94, 0.97), snowFactor);
+      }
+
       vec3 nn = normalize(vN);
       vec3 col = doLight(alb, nn, vP, sunShadow(vP, nn));
-      if (uWet > 0.01) {
+      if (uWet > 0.01 || uSnow > 0.01) {
         vec3 V = normalize(uCamPos - vP);
         vec3 H = normalize(V + uSunDir);
-        col += uSunColor * pow(max(dot(nn, H), 0.0), 60.0) * uWet * 0.5;
+        float specAmt = max(uWet * 0.5, uSnow * 0.35 * (1.0 - smoothstep(0.75, 1.0, abs(u))));
+        col += uSunColor * pow(max(dot(nn, H), 0.0), 60.0) * specAmt;
       }
       col = doFog(col, vP);
       gl_FragColor = vec4(col, 1.0);
@@ -62,9 +80,10 @@ export function createRoadMesh(road: Road, U: Uniforms, state: WanderState, scen
       i1 = Math.min(i0 + PIECE, road.pts.length - 1);
     if (i1 <= i0) return null;
     const count = i1 - i0 + 1;
-    const pos = new Float32Array(count * 2 * 3);
-    const nor = new Float32Array(count * 2 * 3);
-    const uv = new Float32Array(count * 2 * 2);
+    // 4 vertices per cross-section: [0: left skirt base, 1: left edge, 2: right edge, 3: right skirt base]
+    const pos = new Float32Array(count * 4 * 3);
+    const nor = new Float32Array(count * 4 * 3);
+    const uv = new Float32Array(count * 4 * 2);
     const idx: number[] = [];
     for (let i = 0; i < count; i++) {
       const p = road.pts[i0 + i];
@@ -88,28 +107,66 @@ export function createRoadMesh(road: Road, U: Uniforms, state: WanderState, scen
       nx /= nl;
       ny /= nl;
       nz /= nl;
-      const y = p.y + 0.06;
-      const o = i * 6;
-      pos[o] = p.x - rx * ROAD_HALF;
-      pos[o + 1] = y;
-      pos[o + 2] = p.z - rz * ROAD_HALF;
-      pos[o + 3] = p.x + rx * ROAD_HALF;
+
+      const y = p.y + 0.08;
+      const skirtY = p.y - 0.85; // penetrates 85 cm into terrain foundation bed
+      const skirtOffset = ROAD_HALF + 0.45;
+
+      const vi = i * 4;
+      const o = vi * 3;
+
+      // Vertex 0: Left skirt bottom
+      pos[o] = p.x - rx * skirtOffset;
+      pos[o + 1] = skirtY;
+      pos[o + 2] = p.z - rz * skirtOffset;
+      nor[o] = -rx * 0.85 + nx * 0.15;
+      nor[o + 1] = 0.2;
+      nor[o + 2] = -rz * 0.85 + nz * 0.15;
+
+      // Vertex 1: Left road edge
+      pos[o + 3] = p.x - rx * ROAD_HALF;
       pos[o + 4] = y;
-      pos[o + 5] = p.z + rz * ROAD_HALF;
-      nor[o] = nx;
-      nor[o + 1] = ny;
-      nor[o + 2] = nz;
+      pos[o + 5] = p.z - rz * ROAD_HALF;
       nor[o + 3] = nx;
       nor[o + 4] = ny;
       nor[o + 5] = nz;
+
+      // Vertex 2: Right road edge
+      pos[o + 6] = p.x + rx * ROAD_HALF;
+      pos[o + 7] = y;
+      pos[o + 8] = p.z + rz * ROAD_HALF;
+      nor[o + 6] = nx;
+      nor[o + 7] = ny;
+      nor[o + 8] = nz;
+
+      // Vertex 3: Right skirt bottom
+      pos[o + 9] = p.x + rx * skirtOffset;
+      pos[o + 10] = skirtY;
+      pos[o + 11] = p.z + rz * skirtOffset;
+      nor[o + 9] = rx * 0.85 + nx * 0.15;
+      nor[o + 10] = 0.2;
+      nor[o + 11] = rz * 0.85 + nz * 0.15;
+
       const s = (i0 + i) * DS;
-      uv[i * 4] = -1;
-      uv[i * 4 + 1] = s;
-      uv[i * 4 + 2] = 1;
-      uv[i * 4 + 3] = s;
+      const uvi = vi * 2;
+      uv[uvi] = -1.25;
+      uv[uvi + 1] = s;
+      uv[uvi + 2] = -1.0;
+      uv[uvi + 3] = s;
+      uv[uvi + 4] = 1.0;
+      uv[uvi + 5] = s;
+      uv[uvi + 6] = 1.25;
+      uv[uvi + 7] = s;
+
       if (i > 0) {
-        const a = (i - 1) * 2;
-        idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+        const a = (i - 1) * 4;
+        const b = i * 4;
+        // Quad 0: Left skirt (CCW viewed from left)
+        idx.push(a, b, a + 1, b, b + 1, a + 1);
+        // Quad 1: Road carriageway surface (CCW viewed from above)
+        idx.push(a + 1, b + 1, a + 2, a + 2, b + 1, b + 2);
+        // Quad 2: Right skirt (CCW viewed from right)
+        idx.push(a + 2, b + 2, a + 3, b + 2, b + 3, a + 3);
       }
     }
     const g = new THREE.BufferGeometry();
