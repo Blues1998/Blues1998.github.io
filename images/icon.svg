@@ -1,0 +1,28 @@
+<!-- The site mark: one lit body with a ring, the same thing the cosmos
+     scene frames on every page and the share card shows.
+
+     Drawn for 16px first. A tab favicon is rendered at a size where
+     anything with interior detail turns to mush, so the mark is two
+     shapes with a large value gap between them - a bright disc on a dark
+     square - and the ring is a bonus that only appears once there are
+     enough pixels to carry it. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="body" cx="38%" cy="34%" r="72%">
+      <stop offset="0%" stop-color="#e6eaff"/>
+      <stop offset="34%" stop-color="#a3adff"/>
+      <stop offset="72%" stop-color="#6b7aef"/>
+      <stop offset="100%" stop-color="#3b46a8"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="64" height="64" rx="14" fill="#0f1117"/>
+
+  <!-- The ring sits behind the body and is clipped by it on the near side,
+       which is what makes it read as an orbit rather than a halo. -->
+  <ellipse cx="32" cy="32" rx="27" ry="9.5"
+           transform="rotate(-20 32 32)"
+           fill="none" stroke="#7c8aff" stroke-opacity="0.55" stroke-width="2.5"/>
+
+  <circle cx="32" cy="32" r="15" fill="url(#body)"/>
+</svg>

@@ -1,0 +1,1 @@
+const e=[{label:"Playground",slug:"playground",hardReload:!0},{label:"Projects",slug:"projects"},{label:"Photography",slug:"photography"},{label:"Music",slug:"music"},{label:"About",slug:"about"},{label:"Contact",slug:"contact"}];function o(l){const t=l.replace(/^\/+|\/+$/g,"").split("/")[0];return e.findIndex(a=>a.slug===t)}export{e as D,o as d};
