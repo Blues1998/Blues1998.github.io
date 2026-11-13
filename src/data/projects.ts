@@ -40,12 +40,12 @@ export const privateProjects: CuratedProject[] = [
     sourceIsPrivate: true,
   },
   {
-    slug: "cadenza",
-    title: "Cadenza",
+    slug: "sharps-and-flats",
+    title: "Sharps&Flats",
     summary:
-      "An interactive music theory companion: fretboard, circle of fifths, ear training, and a keyboard-driven rhythm game for learning real songs, in light and dark themes.",
-    tech: ["TypeScript", "React", "Web Audio"],
-    href: "https://blues1998.github.io/Cadenza/",
+      "Learn the songs you love on guitar and ukulele: a tuner for instrument and voice, your songs' chords with diagrams and a play-along chart, a metronome, ear training and theory. On the web and Android.",
+    tech: ["TypeScript", "React", "Web Audio", "Capacitor"],
+    href: "https://blues1998.github.io/sharps-and-flats/",
     sourceIsPrivate: false,
   },
   {
